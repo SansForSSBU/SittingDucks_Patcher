@@ -1,5 +1,74 @@
-cave_mem = b'\xff\xff\x5b\x81\xc4\x90\x00\x00\x00\xC3'
-prev_fn_call_mem = b'\xff\x52\x24\xE8\xE5\xFD\xFF\xFF'
+game_ver = "US05"
+game_folder = f"C:/Users/Joseph/Desktop/Ducks/Sitting Ducks {game_ver}"
+original_exe_name = "original.exe" # Rename overlay.exe to original.exe in your game folder to use this patcher.
+output_exe_name = "overlay.exe"
+cave_mems = {
+    "EU": b'\xff\xff\x5b\x81\xc4\x90\x00\x00\x00\xC3',
+    "PO": b'\xb8\xac\xb4\x5a\x00\xe9\x6b\x2d\xff\xff',
+    "RU": b'\xb8\xac\xb4\x5a\x00\xe9\x6b\x2d\xff\xff',
+    "US04": b'\xff\x25\xa8\x21\x59\x00\xb8\xcc\xa3\x5a\x00\xe9\x8b\x2d\xff\xff',
+    "US05": b'\xff\x25\xa8\x21\x59\x00\xb8\xcc\xa3\x5a\x00\xe9\x8b\x2d\xff\xff',
+}
+prev_fn_call_mems = {
+    "EU": b'\xff\x52\x24\xE8\xE5\xFD\xFF\xFF',
+    "PO": b'\xff\x52\x24\xE8\xE5\xFD\xFF\xFF',
+    "RU": b'\xff\x52\x24\xE8\xE5\xFD\xFF\xFF',
+    "US04": b'\xff\x52\x24\xE8\xE5\xFD\xFF\xFF',
+    "US05": b'\xff\x52\x24\xE8\xE5\xFD\xFF\xFF',
+}
+# TODO: Pull mem map out the same way Ghidra does it...
+memMaps = {
+    "EU": [
+        (0x00400000, 0x00000000),
+        (0x00401000, 0x00000400),
+        (0x005d9000, 0x001d8400),
+        (0x005da000, 0x001d9400),
+        (0x005dc000, 0x001db400),
+        (0x005dd000, 0x001dc400),
+    ],
+    "PO":
+    [
+        (0x00400000, 0x0),
+        (0x00401000, 0x1000),
+        (0x00593000, 0x193000),
+        (0x005ad000, 0x1ad000),
+        (0x005da000, 0x1c7000),
+        (0x005dd000, 0x1ca000),
+    ],
+    "RU":
+    [
+        (0x00400000, 0x0),
+        (0x00401000, 0x1000),
+        (0x00593000, 0x193000),
+        (0x005ad000, 0x1ad000),
+        (0x005da000, 0x1c7000),
+        (0x005dd000, 0x1ca000),
+    ],
+    "US04":
+    [
+        (0x00400000, 0x0),
+        (0x00401000, 0x1000),
+        (0x00592000, 0x192000),
+        (0x005ac000, 0x1ac000),
+        (0x005d9000, 0x1c6000),
+        (0x005dc000, 0x1c9000)
+    ],
+    "US05":
+    [
+        (0x00400000, 0x0),
+        (0x00401000, 0x1000),
+        (0x00592000, 0x192000),
+        (0x005ac000, 0x1ac000),
+        (0x005d9000, 0x1c6000),
+        (0x005dc000, 0x1c9000)
+    ],
+}
+cave_mem = cave_mems[game_ver]
+prev_fn_call_mem = prev_fn_call_mems[game_ver]
+memMap = memMaps[game_ver]
+JMP_OPCODE = 0xE9
+CALL_OPCODE = 0xE8
+JMP_INSTRUCTION_LEN = 5
 def get_offset_after(mem, string):
     offset = mem.find(string)
     if offset == -1:
@@ -9,25 +78,14 @@ def get_offset_after(mem, string):
     if mem.find(string, offset) != -1:
         raise Exception("There are multiple possibilities for where to patch! Aborting")
     return offset
-game_folder = "C:/Users/Joseph/Desktop/Ducks/Sitting Ducks EU 2004"
-original_exe_name = "original.exe" # Rename overlay.exe to original.exe in your game folder to use this patcher.
-output_exe_name = "overlay.exe"
+
+
 path = f"{game_folder}/{original_exe_name}"
 with open(path, "rb") as f:
     mem = f.read()
 
-# TODO: Pull mem map out the same way Ghidra does it...
-memmap = [
-    (0x00400000, 0x00000000),
-    (0x00401000, 0x00000400),
-    (0x005d9000, 0x001d8400),
-    (0x005da000, 0x001d9400),
-    (0x005dc000, 0x001db400),
-    (0x005dd000, 0x001dc400)
-]
-JMP_OPCODE = 0xE9
-CALL_OPCODE = 0xE8
-JMP_INSTRUCTION_LEN = 5
+
+
 def get_relative_offset(start, dest):
     offset = dest - start - JMP_INSTRUCTION_LEN
     if offset < 0:
@@ -46,19 +104,28 @@ def make_call_bytes(start, dest):
     instr = bytearray(CALL_OPCODE.to_bytes(1, 'little'))
     instr.extend(bytearray(call_args))
     return instr
+def get_loading_ptr():
+    global game_ver
+    if game_ver == "EU":
+        return bytearray(b"\x9C\x2B\x5C")
+    elif game_ver == "PO" or game_ver == 'RU':
+        return bytearray(b"\xDC\x3B\x5C")
+    elif game_ver == "US04" or game_ver == "US05":
+        return bytearray(b"\x9C\x2B\x5C")
+    else:
+        raise Exception("Unrecognised game version!")
 def get_objective_offset(location, relative_offset):
     return (location + relative_offset + 5) % 0x100000000
-
 def translate_to_runtime_offset(file_offset):
-    for idx, thing in enumerate(memmap):
+    for idx, thing in enumerate(memMap):
         if idx == 0: continue
-        prev = memmap[idx-1]
-        if (file_offset < thing[1] or idx+1 == len(memmap)) and (file_offset > prev[1]):
+        prev = memMap[idx-1]
+        if (file_offset < thing[1] or idx+1 == len(memMap)) and (file_offset > prev[1]):
             return file_offset - prev[1] + prev[0]
 def format_bytes(b):
     return ' '.join(r''+hex(letter)[2:] for letter in b)
 
-cave_offset = get_offset_after(mem, cave_mem) + 4
+cave_offset = get_offset_after(mem, cave_mem)
 frame_advance_call_offset = get_offset_after(mem, prev_fn_call_mem) - 5
 frame_advance_call = mem[frame_advance_call_offset:frame_advance_call_offset+5]
 hijack_ptr = translate_to_runtime_offset(cave_offset)
@@ -75,11 +142,14 @@ jmp_to_hijack = make_jmp_bytes(ret_ptr, hijack_ptr)
 patched_mem[frame_advance_call_offset:frame_advance_call_offset+len(jmp_to_hijack)] = jmp_to_hijack
 
 payload = bytearray(
-    b"\x60\x9C\x83\x3D\x9C\x2B\x5C\x00\x00\x0F\x85\x05\x00\x00\x00"
+    b"\x60\x9C\x83\x3D"
+    b"\x00\x00\x00" # Loading pointer. If 0, we are not loading. Index 4-6.
+    b"\x00\x00\x0F\x85\x05\x00\x00\x00"
     b"\xE8\x00\x00\x00\x00" # CALL to original routine. Index 15-19.
     b"\x9D\x61"
     b"\xE9\x00\x00\x00\x00" # JMP back to where we hijacked from. Index 22-26.
     )
+payload[4:7] = get_loading_ptr()
 jmp_back = make_jmp_bytes(hijack_ptr+22, ret_ptr+5)
 payload[22:27] = jmp_back
 # We need to figure out offset for CALL too.
@@ -91,4 +161,6 @@ patched_mem[cave_offset:cave_offset+len(payload)] = payload
 with open(f"{game_folder}/{output_exe_name}", "wb") as f:
     f.write(patched_mem)
 pass
+print("Hijack point:", hex(ret_ptr))
 print(f"Successfully patched! Patched game is at {game_folder}/{output_exe_name}")
+pass
