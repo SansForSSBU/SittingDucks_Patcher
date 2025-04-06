@@ -9,7 +9,10 @@ def get_offset_after(mem, string):
     if mem.find(string, offset) != -1:
         raise Exception("There are multiple possibilities for where to patch! Aborting")
     return offset
-path = "C:/Users/Joseph/Desktop/Ducks/Sitting Ducks EU 2004/original.exe"
+game_folder = "C:/Users/Joseph/Desktop/Ducks/Sitting Ducks EU 2004"
+original_exe_name = "original.exe" # Rename overlay.exe to original.exe in your game folder to use this patcher.
+output_exe_name = "overlay.exe"
+path = f"{game_folder}/{original_exe_name}"
 with open(path, "rb") as f:
     mem = f.read()
 
@@ -60,10 +63,10 @@ frame_advance_call_offset = get_offset_after(mem, prev_fn_call_mem) - 5
 frame_advance_call = mem[frame_advance_call_offset:frame_advance_call_offset+5]
 hijack_ptr = translate_to_runtime_offset(cave_offset)
 ret_ptr = translate_to_runtime_offset(frame_advance_call_offset)
-print("Hijack ptr:", hex(hijack_ptr))
-print("Ret ptr:", hex(ret_ptr))
-print("File cave offset:", hex(cave_offset))
-print("File frame advance call offset:", hex(frame_advance_call_offset))
+#print("Hijack ptr:", hex(hijack_ptr))
+#print("Ret ptr:", hex(ret_ptr))
+#print("File cave offset:", hex(cave_offset))
+#print("File frame advance call offset:", hex(frame_advance_call_offset))
 
 
 # Time to patch!
@@ -85,6 +88,7 @@ frame_advance_fn_offset = get_objective_offset(int.from_bytes(frame_advance_fn_r
 call_bytes = make_call_bytes(hijack_ptr + 15, frame_advance_fn_offset)
 payload[15:20] = call_bytes
 patched_mem[cave_offset:cave_offset+len(payload)] = payload
-with open("C:/Users/Joseph/Desktop/Ducks/Sitting Ducks EU 2004/overlay.exe", "wb") as f:
+with open(f"{game_folder}/{output_exe_name}", "wb") as f:
     f.write(patched_mem)
 pass
+print(f"Successfully patched! Patched game is at {game_folder}/{output_exe_name}")
