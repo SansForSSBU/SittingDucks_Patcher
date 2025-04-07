@@ -78,7 +78,8 @@ def do_instaload_patch():
     This patch inserts a hijack into a place where normally a function which seems to advance a frame would be called.
     If the game is not loading, it just calls the frame advance function as normal.
     If the game is currently loading, it skips the call to the frame advance function.
-    This effectively forces the game to load in 1 frame. On modern hardware, any stuttering is unnoticable.
+    This effectively forces the game to load in 1 frame. 
+    On modern hardware, this frame still happens so fast you don't even notice.
     I wonder how this would perform on original hardware (a PS2?) 
     Were they making us suffer through 20 second loading screens for no reason?
     """
