@@ -1,77 +1,22 @@
 """
 --- INSTRUCTIONS ---
-Copy "overlay.exe" in your game's folder. Name it "original.exe"
-See the variables below:
-Set game_ver to one of: EU, PO, RU, US04 or US05 depending on what version of the game you have.
 Set game_folder to the path to your game's folder.
 Set instant_loading, speed_issue_fix and new_game_plus to True if you want them enabled, False if you don't.
-Once you've set everything, run the script. It will automatically overwrite overlay.exe.
+Once you've set everything, run the script. It will automatically create a backup and overwrite overlay.exe.
 You should now be able to launch overlay.exe and the mods you've chosen will be active.
 
 NOTE: If using speed issue fix, you must cap the framerate to 60 via an external program such as DxWnd or the game will run incredibly fast.
+Make sure the game is actually running at 60FPS
+If it's running slower despite you setting the frame limiter in DxWnd, try enabling Kill D3D Vsync in DxWnd.
 NOTE: Speedruns must use instant_loading and speed_issue_fix
 """
-game_ver = "EU"
+
 game_folder = "C:/Users/Joseph/Desktop/Ducks/Sitting Ducks EU"
 # MODS
 instant_loading = True
 speed_issue_fix = True
 new_game_plus = False
 
-original_exe_name = "original.exe"
-output_exe_name = "overlay.exe"
-JMP_OPCODE = 0xE9
-CALL_OPCODE = 0xE8
-NOP_OPCODE = 0x90
-JMP_INSTRUCTION_LEN = 5
-# TODO: Pull mem map out the same way Ghidra does it...
-memMaps = {
-    "EU": [
-        (0x00400000, 0x00000000),
-        (0x00401000, 0x00000400),
-        (0x005d9000, 0x001d8400),
-        (0x005da000, 0x001d9400),
-        (0x005dc000, 0x001db400),
-        (0x005dd000, 0x001dc400),
-    ],
-    "PO":
-    [
-        (0x00400000, 0x0),
-        (0x00401000, 0x1000),
-        (0x00593000, 0x193000),
-        (0x005ad000, 0x1ad000),
-        (0x005da000, 0x1c7000),
-        (0x005dd000, 0x1ca000),
-    ],
-    "RU":
-    [
-        (0x00400000, 0x0),
-        (0x00401000, 0x1000),
-        (0x00593000, 0x193000),
-        (0x005ad000, 0x1ad000),
-        (0x005da000, 0x1c7000),
-        (0x005dd000, 0x1ca000),
-    ],
-    "US04":
-    [
-        (0x00400000, 0x0),
-        (0x00401000, 0x1000),
-        (0x00592000, 0x192000),
-        (0x005ac000, 0x1ac000),
-        (0x005d9000, 0x1c6000),
-        (0x005dc000, 0x1c9000)
-    ],
-    "US05":
-    [
-        (0x00400000, 0x0),
-        (0x00401000, 0x1000),
-        (0x00592000, 0x192000),
-        (0x005ac000, 0x1ac000),
-        (0x005d9000, 0x1c6000),
-        (0x005dc000, 0x1c9000)
-    ],
-}
-memMap = memMaps[game_ver]
 def do_instaload_patch():
     """
     Instant loading patch.
@@ -106,11 +51,6 @@ def do_instaload_patch():
     frame_advance_call = mem[frame_advance_call_offset:frame_advance_call_offset+5]
     hijack_ptr = translate_to_runtime_offset(cave_offset)
     ret_ptr = translate_to_runtime_offset(frame_advance_call_offset)
-    #print("Hijack ptr:", hex(hijack_ptr))
-    #print("Ret ptr:", hex(ret_ptr))
-    #print("File cave offset:", hex(cave_offset))
-    #print("File frame advance call offset:", hex(frame_advance_call_offset))
-
 
     # Time to patch!
     jmp_to_hijack = make_jmp_bytes(ret_ptr, hijack_ptr)
@@ -174,6 +114,7 @@ def do_ngplus_mod():
     }
     offset = offsets[game_ver]
     patched_mem[offset] = 0x20
+
 def get_offset_after(mem, string):
     offset = mem.find(string)
     if offset == -1:
@@ -184,17 +125,12 @@ def get_offset_after(mem, string):
         raise Exception("There are multiple possibilities for where to patch! Aborting")
     return offset
 
-
-path = f"{game_folder}/{original_exe_name}"
-
-
-
-
 def get_relative_offset(start, dest):
     offset = dest - start - JMP_INSTRUCTION_LEN
     if offset < 0:
         offset += 0x100000000
     return offset
+
 def make_jmp_bytes(start, dest):
     offset = get_relative_offset(start, dest)
     jmp_args = offset.to_bytes(4, 'little')
@@ -202,12 +138,14 @@ def make_jmp_bytes(start, dest):
     instr.extend(bytearray(jmp_args))
     instr = bytes(instr)
     return instr
+
 def make_call_bytes(start, dest):
     offset = get_relative_offset(start, dest)
     call_args = offset.to_bytes(4, 'little')
     instr = bytearray(CALL_OPCODE.to_bytes(1, 'little'))
     instr.extend(bytearray(call_args))
     return instr
+
 def get_loading_ptr():
     global game_ver
     if game_ver == "EU":
@@ -218,19 +156,102 @@ def get_loading_ptr():
         return bytearray(b"\x9C\x2B\x5C")
     else:
         raise Exception("Unrecognised game version!")
+
 def get_objective_offset(location, relative_offset):
     return (location + relative_offset + 5) % 0x100000000
+
 def translate_to_runtime_offset(file_offset):
     for idx, thing in enumerate(memMap):
         if idx == 0: continue
         prev = memMap[idx-1]
         if (file_offset < thing[1] or idx+1 == len(memMap)) and (file_offset > prev[1]):
             return file_offset - prev[1] + prev[0]
+
 def format_bytes(b):
     return ' '.join(r''+hex(letter)[2:] for letter in b)
 
-with open(path, "rb") as f:
-    mem = f.read()
+def get_file_hash(path):
+    with open(path, "rb") as f:
+        return game_vers[hashlib.file_digest(f, "md5").digest()]
+import hashlib
+JMP_OPCODE = 0xE9
+CALL_OPCODE = 0xE8
+NOP_OPCODE = 0x90
+JMP_INSTRUCTION_LEN = 5
+# TODO: Pull mem map out the same way Ghidra does it...
+game_vers = {
+    b'\x83t\x1e\x0c\x07\xc4\x19\xaf\x14j\xc9Y\xc1\xe6\x81\\': "EU",
+    b'\x0e\xc3G\xb6\xa9nP\xa3\xf6\xbcw\xbfgZ\xb1\x93': "PO",
+    b'\xe8\xd8\xfa5\xff\x9f\xecw\x1b\xfd\xfa\x81\xe1\x0c\xf9\x04': "RU",
+    b'\xa4KgS\x7f+\xec\x16#\xa7\x9bx\xc7\x12\xae\x1b': "US04",
+    b'\xcf2\xa4\x94\x80-\xdb\x0c\xd3S\xac\xa4\xf6D9\x98': "US05"
+}
+memMaps = {
+    "EU": [
+        (0x00400000, 0x00000000),
+        (0x00401000, 0x00000400),
+        (0x005d9000, 0x001d8400),
+        (0x005da000, 0x001d9400),
+        (0x005dc000, 0x001db400),
+        (0x005dd000, 0x001dc400),
+    ],
+    "PO":
+    [
+        (0x00400000, 0x0),
+        (0x00401000, 0x1000),
+        (0x00593000, 0x193000),
+        (0x005ad000, 0x1ad000),
+        (0x005da000, 0x1c7000),
+        (0x005dd000, 0x1ca000),
+    ],
+    "RU":
+    [
+        (0x00400000, 0x0),
+        (0x00401000, 0x1000),
+        (0x00593000, 0x193000),
+        (0x005ad000, 0x1ad000),
+        (0x005da000, 0x1c7000),
+        (0x005dd000, 0x1ca000),
+    ],
+    "US04":
+    [
+        (0x00400000, 0x0),
+        (0x00401000, 0x1000),
+        (0x00592000, 0x192000),
+        (0x005ac000, 0x1ac000),
+        (0x005d9000, 0x1c6000),
+        (0x005dc000, 0x1c9000)
+    ],
+    "US05":
+    [
+        (0x00400000, 0x0),
+        (0x00401000, 0x1000),
+        (0x00592000, 0x192000),
+        (0x005ac000, 0x1ac000),
+        (0x005d9000, 0x1c6000),
+        (0x005dc000, 0x1c9000)
+    ],
+}
+backup_exe_name = "backup_overlay.exe"
+output_exe_name = "overlay.exe"
+try:
+    with open(f"{game_folder}/{backup_exe_name}", "rb") as f:
+        mem = f.read()
+        
+except FileNotFoundError:
+    # This must be the first time we're running, so let's create the backup.
+    try:
+        with open(f"{game_folder}/{output_exe_name}", "rb") as f:
+            mem = f.read()
+            
+    except FileNotFoundError:
+        print(f"Invalid game folder: {game_folder}")
+        raise Exception("Bad game folder")
+    with open(f"{game_folder}/{backup_exe_name}", "wb") as f:
+        f.write(mem)
+
+game_ver = get_file_hash(f"{game_folder}/{backup_exe_name}")
+memMap = memMaps[game_ver]
 patched_mem = bytearray(mem)
 
 if instant_loading: do_instaload_patch()
@@ -239,4 +260,7 @@ if new_game_plus: do_ngplus_mod()
 
 with open(f"{game_folder}/{output_exe_name}", "wb") as f:
     f.write(patched_mem)
-print(f"Successfully patched! Patched game is at {game_folder}/{output_exe_name}")
+print(f"""Successfully patched game at {game_folder} with mods:
+Fast loading: {instant_loading}
+Speed issue fix: {speed_issue_fix}
+New game plus: {new_game_plus}""")
