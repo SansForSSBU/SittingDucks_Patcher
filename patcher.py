@@ -56,6 +56,15 @@ memMaps = {
 }
 memMap = memMaps[game_ver]
 def do_instaload_patch():
+    """
+    Instant loading patch.
+    This patch inserts a hijack into a place where normally a function which seems to advance a frame would be called.
+    If the game is not loading, it just calls the frame advance function as normal.
+    If the game is currently loading, it skips the call to the frame advance function.
+    This effectively forces the game to load in 1 frame. On modern hardware, any stuttering is unnoticable.
+    I wonder how this would perform on original hardware (a PS2?) 
+    Were they making us suffer through 20 second loading screens for no reason?
+    """
     global patched_mem
     cave_mems = {
         "EU": b'\xff\xff\x5b\x81\xc4\x90\x00\x00\x00\xC3',
@@ -109,13 +118,40 @@ def do_instaload_patch():
     patched_mem[cave_offset:cave_offset+len(payload)] = payload
 
 def do_speed_issue_fix():
+    """
+    Speed issue fix
+    Due to a bizarre quirk with how the game determines how long ago the last frame (fdelta) was which I still don't understand
+    the game would run at inconsistent speeds. Usually this was 98-107% of the normal game speed.
+    We have seen the game running as fast as 110% of it's normal speed though this was a one-off anomaly.
+    This happens when capping FPS at 60 via dxwnd.
+    This patch fixes the issue by preventing the game from storing its best guess of how long it's been since the last frame into fdelta
+    The game also sets this to 0.033333 in some places (the developers probably forgot to remove these instructions when porting from the PS2 where the intended FPS was 30FPS). This patch nops out the instruction which do that too.
+    By a lucky coincidence, fdelta is initialised to 0.016666 (60fps) on startup, so no need to change that :)
+    """
     global patched_mem
     find1 = b"\x32\xd2\xd9" # From d9 idx, 6 total bytes must be nopped out (including d9). This removes an instruction which sets fdelta every frame.
     find2 = b"\x88\x51\x1c\xc7" # From c7 idx, 10 total bytes must be nopped out (including c7). This removes an instruction which sets frame delta to 0.033.
-    x = get_offset_after(mem, find1) - 1#mem.find(find1) + len(find1) - 1
+    x = get_offset_after(mem, find1) - 1
     patched_mem[x:x+6] = NOP_OPCODE.to_bytes()*6
-    y = get_offset_after(mem, find2) - 1#mem.find(find2) + len(find2) - 1
+    y = get_offset_after(mem, find2) - 1
     patched_mem[y:y+10] = NOP_OPCODE.to_bytes()*10
+
+def do_ngplus_mod():
+    """
+    New game plus mod
+    Makes you start the game with all items
+    Patches an instruction which was setting whether you had the item at the start of the game to 0.
+    It was moving BL (lower part of B register, which is 0 in this case) into the flag.
+    I patched it so it moves AH (upper part of A register) in.
+    This actually sets whether you have the item to a number greater than 1, which is not normal.
+    But any value except 0 counts as having the item, so it works :)
+    """
+    offsets = {
+        "EU": 0x93C3E,
+        "RU": 0x947DE,
+    }
+    offset = offsets[game_ver]
+    patched_mem[offset] = 0x20
 def get_offset_after(mem, string):
     offset = mem.find(string)
     if offset == -1:
@@ -176,6 +212,7 @@ with open(path, "rb") as f:
 
 do_instaload_patch()
 do_speed_issue_fix()
+do_ngplus_mod()
 
 with open(f"{game_folder}/{output_exe_name}", "wb") as f:
     f.write(patched_mem)
