@@ -1,21 +1,12 @@
-game_ver = "US05"
-game_folder = f"C:/Users/Joseph/Desktop/Ducks/Sitting Ducks {game_ver}"
+game_ver = "EU"
+game_folder = f"C:/Users/Joseph/Desktop/Ducks/Sitting Ducks EU"
 original_exe_name = "original.exe" # Rename overlay.exe to original.exe in your game folder to use this patcher.
 output_exe_name = "overlay.exe"
-cave_mems = {
-    "EU": b'\xff\xff\x5b\x81\xc4\x90\x00\x00\x00\xC3',
-    "PO": b'\xb8\xac\xb4\x5a\x00\xe9\x6b\x2d\xff\xff',
-    "RU": b'\xb8\xac\xb4\x5a\x00\xe9\x6b\x2d\xff\xff',
-    "US04": b'\xff\x25\xa8\x21\x59\x00\xb8\xcc\xa3\x5a\x00\xe9\x8b\x2d\xff\xff',
-    "US05": b'\xff\x25\xa8\x21\x59\x00\xb8\xcc\xa3\x5a\x00\xe9\x8b\x2d\xff\xff',
-}
-prev_fn_call_mems = {
-    "EU": b'\xff\x52\x24\xE8\xE5\xFD\xFF\xFF',
-    "PO": b'\xff\x52\x24\xE8\xE5\xFD\xFF\xFF',
-    "RU": b'\xff\x52\x24\xE8\xE5\xFD\xFF\xFF',
-    "US04": b'\xff\x52\x24\xE8\xE5\xFD\xFF\xFF',
-    "US05": b'\xff\x52\x24\xE8\xE5\xFD\xFF\xFF',
-}
+
+JMP_OPCODE = 0xE9
+CALL_OPCODE = 0xE8
+NOP_OPCODE = 0x90
+JMP_INSTRUCTION_LEN = 5
 # TODO: Pull mem map out the same way Ghidra does it...
 memMaps = {
     "EU": [
@@ -63,12 +54,68 @@ memMaps = {
         (0x005dc000, 0x1c9000)
     ],
 }
-cave_mem = cave_mems[game_ver]
-prev_fn_call_mem = prev_fn_call_mems[game_ver]
 memMap = memMaps[game_ver]
-JMP_OPCODE = 0xE9
-CALL_OPCODE = 0xE8
-JMP_INSTRUCTION_LEN = 5
+def do_instaload_patch():
+    global patched_mem
+    cave_mems = {
+        "EU": b'\xff\xff\x5b\x81\xc4\x90\x00\x00\x00\xC3',
+        "PO": b'\xb8\xac\xb4\x5a\x00\xe9\x6b\x2d\xff\xff',
+        "RU": b'\xb8\xac\xb4\x5a\x00\xe9\x6b\x2d\xff\xff',
+        "US04": b'\xff\x25\xa8\x21\x59\x00\xb8\xcc\xa3\x5a\x00\xe9\x8b\x2d\xff\xff',
+        "US05": b'\xff\x25\xa8\x21\x59\x00\xb8\xcc\xa3\x5a\x00\xe9\x8b\x2d\xff\xff',
+    }
+    prev_fn_call_mems = {
+        "EU": b'\xff\x52\x24\xE8\xE5\xFD\xFF\xFF',
+        "PO": b'\xff\x52\x24\xE8\xE5\xFD\xFF\xFF',
+        "RU": b'\xff\x52\x24\xE8\xE5\xFD\xFF\xFF',
+        "US04": b'\xff\x52\x24\xE8\xE5\xFD\xFF\xFF',
+        "US05": b'\xff\x52\x24\xE8\xE5\xFD\xFF\xFF',
+    }
+    cave_mem = cave_mems[game_ver]
+    prev_fn_call_mem = prev_fn_call_mems[game_ver]
+    
+    cave_offset = get_offset_after(mem, cave_mem)
+    frame_advance_call_offset = get_offset_after(mem, prev_fn_call_mem) - 5
+    frame_advance_call = mem[frame_advance_call_offset:frame_advance_call_offset+5]
+    hijack_ptr = translate_to_runtime_offset(cave_offset)
+    ret_ptr = translate_to_runtime_offset(frame_advance_call_offset)
+    #print("Hijack ptr:", hex(hijack_ptr))
+    #print("Ret ptr:", hex(ret_ptr))
+    #print("File cave offset:", hex(cave_offset))
+    #print("File frame advance call offset:", hex(frame_advance_call_offset))
+
+
+    # Time to patch!
+    patched_mem = bytearray(mem)
+    jmp_to_hijack = make_jmp_bytes(ret_ptr, hijack_ptr)
+    patched_mem[frame_advance_call_offset:frame_advance_call_offset+len(jmp_to_hijack)] = jmp_to_hijack
+
+    payload = bytearray(
+        b"\x60\x9C\x83\x3D"
+        b"\x00\x00\x00" # Loading pointer. If 0, we are not loading. Index 4-6.
+        b"\x00\x00\x0F\x85\x05\x00\x00\x00"
+        b"\xE8\x00\x00\x00\x00" # CALL to original routine. Index 15-19.
+        b"\x9D\x61"
+        b"\xE9\x00\x00\x00\x00" # JMP back to where we hijacked from. Index 22-26.
+        )
+    payload[4:7] = get_loading_ptr()
+    jmp_back = make_jmp_bytes(hijack_ptr+22, ret_ptr+5)
+    payload[22:27] = jmp_back
+    # We need to figure out offset for CALL too.
+    frame_advance_fn_relative_offset = frame_advance_call[1:]
+    frame_advance_fn_offset = get_objective_offset(int.from_bytes(frame_advance_fn_relative_offset, "little"), ret_ptr)
+    call_bytes = make_call_bytes(hijack_ptr + 15, frame_advance_fn_offset)
+    payload[15:20] = call_bytes
+    patched_mem[cave_offset:cave_offset+len(payload)] = payload
+
+def do_speed_issue_fix():
+    global patched_mem
+    find1 = b"\x32\xd2\xd9" # From d9 idx, 6 total bytes must be nopped out (including d9). This removes an instruction which sets fdelta every frame.
+    find2 = b"\x88\x51\x1c\xc7" # From c7 idx, 10 total bytes must be nopped out (including c7). This removes an instruction which sets frame delta to 0.033.
+    x = get_offset_after(mem, find1) - 1#mem.find(find1) + len(find1) - 1
+    patched_mem[x:x+6] = NOP_OPCODE.to_bytes()*6
+    y = get_offset_after(mem, find2) - 1#mem.find(find2) + len(find2) - 1
+    patched_mem[y:y+10] = NOP_OPCODE.to_bytes()*10
 def get_offset_after(mem, string):
     offset = mem.find(string)
     if offset == -1:
@@ -81,8 +128,7 @@ def get_offset_after(mem, string):
 
 
 path = f"{game_folder}/{original_exe_name}"
-with open(path, "rb") as f:
-    mem = f.read()
+
 
 
 
@@ -125,42 +171,12 @@ def translate_to_runtime_offset(file_offset):
 def format_bytes(b):
     return ' '.join(r''+hex(letter)[2:] for letter in b)
 
-cave_offset = get_offset_after(mem, cave_mem)
-frame_advance_call_offset = get_offset_after(mem, prev_fn_call_mem) - 5
-frame_advance_call = mem[frame_advance_call_offset:frame_advance_call_offset+5]
-hijack_ptr = translate_to_runtime_offset(cave_offset)
-ret_ptr = translate_to_runtime_offset(frame_advance_call_offset)
-#print("Hijack ptr:", hex(hijack_ptr))
-#print("Ret ptr:", hex(ret_ptr))
-#print("File cave offset:", hex(cave_offset))
-#print("File frame advance call offset:", hex(frame_advance_call_offset))
+with open(path, "rb") as f:
+    mem = f.read()
 
+do_instaload_patch()
+do_speed_issue_fix()
 
-# Time to patch!
-patched_mem = bytearray(mem)
-jmp_to_hijack = make_jmp_bytes(ret_ptr, hijack_ptr)
-patched_mem[frame_advance_call_offset:frame_advance_call_offset+len(jmp_to_hijack)] = jmp_to_hijack
-
-payload = bytearray(
-    b"\x60\x9C\x83\x3D"
-    b"\x00\x00\x00" # Loading pointer. If 0, we are not loading. Index 4-6.
-    b"\x00\x00\x0F\x85\x05\x00\x00\x00"
-    b"\xE8\x00\x00\x00\x00" # CALL to original routine. Index 15-19.
-    b"\x9D\x61"
-    b"\xE9\x00\x00\x00\x00" # JMP back to where we hijacked from. Index 22-26.
-    )
-payload[4:7] = get_loading_ptr()
-jmp_back = make_jmp_bytes(hijack_ptr+22, ret_ptr+5)
-payload[22:27] = jmp_back
-# We need to figure out offset for CALL too.
-frame_advance_fn_relative_offset = frame_advance_call[1:]
-frame_advance_fn_offset = get_objective_offset(int.from_bytes(frame_advance_fn_relative_offset, "little"), ret_ptr)
-call_bytes = make_call_bytes(hijack_ptr + 15, frame_advance_fn_offset)
-payload[15:20] = call_bytes
-patched_mem[cave_offset:cave_offset+len(payload)] = payload
 with open(f"{game_folder}/{output_exe_name}", "wb") as f:
     f.write(patched_mem)
-pass
-print("Hijack point:", hex(ret_ptr))
 print(f"Successfully patched! Patched game is at {game_folder}/{output_exe_name}")
-pass
