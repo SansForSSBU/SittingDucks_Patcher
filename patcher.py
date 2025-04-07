@@ -1,12 +1,25 @@
+"""
+--- INSTRUCTIONS ---
+Copy "overlay.exe" in your game's folder. Name it "original.exe"
+See the variables below:
+Set game_ver to one of: EU, PO, RU, US04 or US05 depending on what version of the game you have.
+Set game_folder to the path to your game's folder.
+Set instant_loading, speed_issue_fix and new_game_plus to True if you want them enabled, False if you don't.
+Once you've set everything, run the script. It will automatically overwrite overlay.exe.
+You should now be able to launch overlay.exe and the mods you've chosen will be active.
+
+NOTE: If using speed issue fix, you must cap the framerate to 60 via an external program such as DxWnd or the game will run incredibly fast.
+NOTE: Speedruns must use instant_loading and speed_issue_fix
+"""
 game_ver = "EU"
-game_folder = f"C:/Users/Joseph/Desktop/Ducks/Sitting Ducks EU"
-original_exe_name = "original.exe" # Rename overlay.exe to original.exe in your game folder to use this patcher.
-output_exe_name = "overlay.exe"
+game_folder = "C:/Users/Joseph/Desktop/Ducks/Sitting Ducks EU"
 # MODS
 instant_loading = True
 speed_issue_fix = True
 new_game_plus = False
 
+original_exe_name = "original.exe"
+output_exe_name = "overlay.exe"
 JMP_OPCODE = 0xE9
 CALL_OPCODE = 0xE8
 NOP_OPCODE = 0x90
