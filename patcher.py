@@ -113,7 +113,6 @@ def do_instaload_patch():
 
 
     # Time to patch!
-    patched_mem = bytearray(mem)
     jmp_to_hijack = make_jmp_bytes(ret_ptr, hijack_ptr)
     patched_mem[frame_advance_call_offset:frame_advance_call_offset+len(jmp_to_hijack)] = jmp_to_hijack
 
@@ -231,6 +230,7 @@ def format_bytes(b):
 
 with open(path, "rb") as f:
     mem = f.read()
+patched_mem = bytearray(mem)
 
 if instant_loading: do_instaload_patch()
 if speed_issue_fix: do_speed_issue_fix()
