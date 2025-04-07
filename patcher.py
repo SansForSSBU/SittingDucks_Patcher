@@ -164,6 +164,7 @@ def do_ngplus_mod():
     But any value except 0 counts as having the item, so it works :)
     
     """
+    global patched_mem
     offsets = {
         "EU": 0x93C3E,
         "RU": 0x947DE,
