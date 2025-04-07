@@ -2,6 +2,10 @@ game_ver = "EU"
 game_folder = f"C:/Users/Joseph/Desktop/Ducks/Sitting Ducks EU"
 original_exe_name = "original.exe" # Rename overlay.exe to original.exe in your game folder to use this patcher.
 output_exe_name = "overlay.exe"
+# MODS
+instant_loading = True
+speed_issue_fix = True
+new_game_plus = False
 
 JMP_OPCODE = 0xE9
 CALL_OPCODE = 0xE8
@@ -145,10 +149,14 @@ def do_ngplus_mod():
     I patched it so it moves AH (upper part of A register) in.
     This actually sets whether you have the item to a number greater than 1, which is not normal.
     But any value except 0 counts as having the item, so it works :)
+    
     """
     offsets = {
         "EU": 0x93C3E,
         "RU": 0x947DE,
+        "PO": 0x947FE,
+        "US04": 0x94D3A,
+        "US05": 0x94D3A,
     }
     offset = offsets[game_ver]
     patched_mem[offset] = 0x20
@@ -210,9 +218,9 @@ def format_bytes(b):
 with open(path, "rb") as f:
     mem = f.read()
 
-do_instaload_patch()
-do_speed_issue_fix()
-do_ngplus_mod()
+if instant_loading: do_instaload_patch()
+if speed_issue_fix: do_speed_issue_fix()
+if new_game_plus: do_ngplus_mod()
 
 with open(f"{game_folder}/{output_exe_name}", "wb") as f:
     f.write(patched_mem)
