@@ -247,7 +247,12 @@ memMaps = {
     ],
 }
 backup_exe_name = "backup_overlay.exe"
-output_exe_name = "overlay.exe"
+try:
+    with open(f"{game_folder}/overlay.exe"):
+        output_exe_name = "overlay.exe"
+except FileNotFoundError:
+    output_exe_name = "OVERLAY.exe"
+
 try:
     with open(f"{game_folder}/{backup_exe_name}", "rb") as f:
         mem = f.read()
@@ -257,7 +262,6 @@ except FileNotFoundError:
     try:
         with open(f"{game_folder}/{output_exe_name}", "rb") as f:
             mem = f.read()
-            
     except FileNotFoundError:
         print(f"Invalid game folder: {game_folder}")
         raise Exception("Bad game folder")
