@@ -11,7 +11,7 @@ If it's running slower despite you setting the frame limiter in DxWnd, try enabl
 NOTE: Speedruns must use instant_loading and speed_issue_fix
 """
 
-game_folder = "C:/Users/Joseph/Desktop/Ducks/Sitting Ducks EU"
+game_folder = "C:/Users/Joseph/Desktop/Ducks/Sitting Ducks US05"
 # MODS
 instant_loading = True
 speed_issue_fix = True
@@ -86,12 +86,26 @@ def do_speed_issue_fix():
     By a lucky coincidence, fdelta is initialised to 0.016666 (60fps) on startup, so no need to change that :)
     """
     global patched_mem
-    find1 = b"\x32\xd2\xd9" # From d9 idx, 6 total bytes must be nopped out (including d9). This removes an instruction which sets fdelta every frame.
-    find2 = b"\x88\x51\x1c\xc7" # From c7 idx, 10 total bytes must be nopped out (including c7). This removes an instruction which sets frame delta to 0.033.
+    find1 = b"\x32\xd2\xd9" 
+    find2 = b"\x88\x51\x1c\xc7" 
     x = get_offset_after(mem, find1) - 1
-    patched_mem[x:x+6] = NOP_OPCODE.to_bytes()*6
+    dump_addrs = {
+        "US05": 0x005c5f00,
+        "US04": 0x005c5f00,
+        "EU": 0x005ddf00,
+        "RU": 0x005c6f00,
+        "PO": 0x005c6fff,
+
+    }
+    dump_addr = dump_addrs[game_ver].to_bytes(4, 'little')
+    # Change FSTP which was storing fdelta somewhere it's used to store it in an unused place in memory.
+    patched_mem[x+2:x+6] = dump_addr
+    # Change the 0.33333 to 0.166666
     y = get_offset_after(mem, find2) - 1
-    patched_mem[y:y+10] = NOP_OPCODE.to_bytes()*10
+    patched_mem[y+6] = 0x89
+    patched_mem[y+7] = 0x88
+    patched_mem[y+8] = 0x88
+    patched_mem[y+9] = 0x3c
 
 def do_ngplus_mod():
     """
