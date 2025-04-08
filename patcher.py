@@ -11,7 +11,7 @@ If it's running slower despite you setting the frame limiter in DxWnd, try enabl
 NOTE: Speedruns must use instant_loading and speed_issue_fix
 """
 
-game_folder = "C:/Users/Joseph/Desktop/Ducks/Sitting Ducks US05"
+game_folder = "C:/Users/Joseph/Desktop/Ducks/Sitting Ducks EU"
 # MODS
 instant_loading = True
 speed_issue_fix = True
@@ -94,7 +94,7 @@ def do_speed_issue_fix():
         "US04": 0x005c5f00,
         "EU": 0x005ddf00,
         "RU": 0x005c6f00,
-        "PO": 0x005c6fff,
+        "PO": 0x005c6f00,
 
     }
     dump_addr = dump_addrs[game_ver].to_bytes(4, 'little')
