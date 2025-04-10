@@ -69,7 +69,7 @@ def do_instaload_patch():
     payload[22:27] = jmp_back
     # We need to figure out offset for CALL too.
     frame_advance_fn_relative_offset = frame_advance_call[1:]
-    frame_advance_fn_offset = get_objective_offset(int.from_bytes(frame_advance_fn_relative_offset, "little"), ret_ptr)
+    frame_advance_fn_offset = get_jmp_destination(int.from_bytes(frame_advance_fn_relative_offset, "little"), ret_ptr)
     call_bytes = make_call_bytes(hijack_ptr + 15, frame_advance_fn_offset)
     payload[15:20] = call_bytes
     patched_mem[cave_offset:cave_offset+len(payload)] = payload
@@ -88,7 +88,7 @@ def do_speed_issue_fix():
     global patched_mem
     find1 = b"\x32\xd2\xd9" 
     find2 = b"\x88\x51\x1c\xc7" 
-    x = get_offset_after(mem, find1) - 1
+    x = find_1(find1) + len(find1) - 1
     dump_addrs = {
         "US05": 0x005c5f00,
         "US04": 0x005c5f00,
@@ -101,7 +101,7 @@ def do_speed_issue_fix():
     # Change FSTP which was storing fdelta somewhere it's used to store it in an unused place in memory.
     patched_mem[x+2:x+6] = dump_addr
     # Change the 0.33333 to 0.166666
-    y = get_offset_after(mem, find2) - 1
+    y = find_1(find2) + len(find2) - 1
     patched_mem[y+6] = 0x89
     patched_mem[y+7] = 0x88
     patched_mem[y+8] = 0x88
@@ -151,7 +151,7 @@ def find_1(find: bytearray):
     """
     global patched_mem
     offset = patched_mem.index(find)
-    if patched_mem.find(find, offset) != -1: raise ValueError("Found multiple occurrences")
+    if patched_mem.find(find, offset + 1) != -1: raise ValueError("Found multiple occurrences")
     return offset
 
 def replace_1(find: bytearray, replace: bytearray):
@@ -171,14 +171,11 @@ def replace_1(find: bytearray, replace: bytearray):
     offset = find_1(find)
     patched_mem[offset:offset+len(find)] = replace
 
-def get_relative_offset(start, dest):
-    offset = dest - start - JMP_INSTRUCTION_LEN
-    if offset < 0:
-        offset += 0x100000000
-    return offset
+def get_offset_for_jmp(start, dest):
+    return (dest - start - JMP_INSTRUCTION_LEN) % 0x100000000
 
 def make_jmp_bytes(start, dest):
-    offset = get_relative_offset(start, dest)
+    offset = get_offset_for_jmp(start, dest)
     jmp_args = offset.to_bytes(4, 'little')
     instr = bytearray(JMP_OPCODE.to_bytes(1, 'little'))
     instr.extend(bytearray(jmp_args))
@@ -186,7 +183,7 @@ def make_jmp_bytes(start, dest):
     return instr
 
 def make_call_bytes(start, dest):
-    offset = get_relative_offset(start, dest)
+    offset = get_offset_for_jmp(start, dest)
     call_args = offset.to_bytes(4, 'little')
     instr = bytearray(CALL_OPCODE.to_bytes(1, 'little'))
     instr.extend(bytearray(call_args))
@@ -203,8 +200,8 @@ def get_loading_ptr():
     else:
         raise Exception("Unrecognised game version!")
 
-def get_objective_offset(location, relative_offset):
-    return (location + relative_offset + 5) % 0x100000000
+def get_jmp_destination(location, relative_offset):
+    return (location + relative_offset + JMP_INSTRUCTION_LEN) % 0x100000000
 
 def translate_to_runtime_offset(file_offset):
     for idx, thing in enumerate(memMap):
@@ -279,38 +276,53 @@ memMaps = {
     ],
 }
 backup_exe_name = "backup_overlay.exe"
-try:
-    with open(f"{game_folder}/overlay.exe"):
-        output_exe_name = "overlay.exe"
-except FileNotFoundError:
-    output_exe_name = "OVERLAY.exe"
 
-try:
-    with open(f"{game_folder}/{backup_exe_name}", "rb") as f:
-        mem = f.read()
-        
-except FileNotFoundError:
-    # This must be the first time we're running, so let's create the backup.
+def load_base_game():
+    global mem
+    global output_exe_name
     try:
-        with open(f"{game_folder}/{output_exe_name}", "rb") as f:
+        with open(f"{game_folder}/overlay.exe"):
+            output_exe_name = "overlay.exe"
+    except FileNotFoundError:
+        output_exe_name = "OVERLAY.exe"
+    try:
+        with open(f"{game_folder}/{backup_exe_name}", "rb") as f:
             mem = f.read()
     except FileNotFoundError:
-        print(f"Invalid game folder: {game_folder}")
-        raise Exception("Bad game folder")
+        try:
+            with open(f"{game_folder}/{output_exe_name}", "rb") as f:
+                mem = f.read()
+        except FileNotFoundError:
+            raise ValueError("Game folder does not contain overlay.exe")
+
+def make_backup_exe():
+    global mem
     with open(f"{game_folder}/{backup_exe_name}", "wb") as f:
         f.write(mem)
 
-game_ver = get_file_hash(f"{game_folder}/{backup_exe_name}")
-memMap = memMaps[game_ver]
-patched_mem = bytearray(mem)
+def write_patch():
+    global patched_mem
+    with open(f"{game_folder}/{output_exe_name}", "wb") as f:
+        f.write(patched_mem)
+    print(f"""Successfully patched game at {game_folder} with mods:
+    Fast loading: {instant_loading}
+    Speed issue fix: {speed_issue_fix}
+    New game plus: {new_game_plus}""")
 
-if instant_loading: do_instaload_patch()
-if speed_issue_fix: do_speed_issue_fix()
-if new_game_plus: do_ngplus_mod()
+def main():
+    global memMap
+    global patched_mem
+    global game_ver
+    load_base_game()
+    make_backup_exe()
+    game_ver = get_file_hash(f"{game_folder}/{backup_exe_name}")
+    memMap = memMaps[game_ver]
+    patched_mem = bytearray(mem)
 
-with open(f"{game_folder}/{output_exe_name}", "wb") as f:
-    f.write(patched_mem)
-print(f"""Successfully patched game at {game_folder} with mods:
-Fast loading: {instant_loading}
-Speed issue fix: {speed_issue_fix}
-New game plus: {new_game_plus}""")
+    if instant_loading: do_instaload_patch()
+    if speed_issue_fix: do_speed_issue_fix()
+    if new_game_plus: do_ngplus_mod()
+    write_patch()
+
+if __name__ == "__main__":
+    main()
