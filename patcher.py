@@ -65,9 +65,8 @@ def do_instaload_patch():
         b"\xE9\x00\x00\x00\x00" # JMP back to where we hijacked from. Index 22-26.
         )
     payload[4:7] = get_loading_ptr()
-    jmp_back = make_jmp_bytes(hijack_ptr + len(payload) - 5, ret_ptr)
+    jmp_back = make_jmp_bytes(hijack_ptr + len(payload) - 5, ret_ptr + 5)
     payload[22:27] = jmp_back
-    # We need to figure out offset for CALL too.
     frame_advance_fn_relative_offset = frame_advance_call[1:]
     frame_advance_fn_offset = get_jmp_destination(int.from_bytes(frame_advance_fn_relative_offset, "little"), ret_ptr)
     call_bytes = make_call_bytes(hijack_ptr + 15, frame_advance_fn_offset)
