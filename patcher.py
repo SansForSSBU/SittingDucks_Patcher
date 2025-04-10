@@ -50,7 +50,7 @@ def do_instaload_patch():
     frame_advance_call_offset = find_1(prev_fn_call_mem) + len(prev_fn_call_mem) - 5
     frame_advance_call = mem[frame_advance_call_offset:frame_advance_call_offset+5]
     hijack_ptr = translate_to_runtime_offset(cave_offset)
-    ret_ptr = translate_to_runtime_offset(frame_advance_call_offset) + len(frame_advance_call)
+    ret_ptr = translate_to_runtime_offset(frame_advance_call_offset) + len(frame_advance_call) - 5
 
     # Time to patch!
     jmp_to_hijack = make_jmp_bytes(ret_ptr, hijack_ptr)
