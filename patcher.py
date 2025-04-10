@@ -10,13 +10,26 @@ Make sure the game is actually running at 60FPS
 If it's running slower despite you setting the frame limiter in DxWnd, try enabling Kill D3D Vsync in DxWnd.
 NOTE: Speedruns must use instant_loading and speed_issue_fix
 """
-
+from enum import Enum
 game_folder = "C:/Users/Joseph/Desktop/Ducks/Sitting Ducks EU"
 # MODS
 instant_loading = True
 speed_issue_fix = True
 new_game_plus = False
 
+class OffsetType(Enum):
+    FILE=0
+    RUNTIME=1
+
+class Offset():
+    def __init__(self, type: OffsetType, offset):
+        self.type = type
+        # Internally, we store all offsets as file offsets.
+        if type == OffsetType.FILE:
+            self.offset = offset
+        else:
+            self.offset = transla
+    
 def do_instaload_patch():
     """
     Instant loading patch.
@@ -212,6 +225,13 @@ def translate_to_runtime_offset(file_offset):
         prev = memMap[idx-1]
         if (file_offset < thing[1] or idx+1 == len(memMap)) and (file_offset > prev[1]):
             return file_offset - prev[1] + prev[0]
+
+def translate_to_file_offset(runtime_offset):
+    for idx, thing in enumerate(memMap):
+        if idx == 0: continue
+        prev = memMap[idx-1]
+        if (runtime_offset < thing[0] or idx+1 == len(memMap)) and (runtime_offset > prev[0]):
+            return runtime_offset - prev[0] + prev[1]    
 
 def format_bytes(b):
     return ' '.join(r''+hex(letter)[2:] for letter in b)
