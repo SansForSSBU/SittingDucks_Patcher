@@ -46,11 +46,11 @@ def do_instaload_patch():
     cave_mem = cave_mems[game_ver]
     prev_fn_call_mem = prev_fn_call_mems[game_ver]
     
-    cave_offset = get_offset_after(mem, cave_mem)
-    frame_advance_call_offset = get_offset_after(mem, prev_fn_call_mem) - 5
+    cave_offset = find_1(cave_mem) + len(cave_mem)
+    frame_advance_call_offset = find_1(prev_fn_call_mem) + len(prev_fn_call_mem) - 5
     frame_advance_call = mem[frame_advance_call_offset:frame_advance_call_offset+5]
     hijack_ptr = translate_to_runtime_offset(cave_offset)
-    ret_ptr = translate_to_runtime_offset(frame_advance_call_offset)
+    ret_ptr = translate_to_runtime_offset(frame_advance_call_offset) + len(frame_advance_call)
 
     # Time to patch!
     jmp_to_hijack = make_jmp_bytes(ret_ptr, hijack_ptr)
@@ -65,7 +65,7 @@ def do_instaload_patch():
         b"\xE9\x00\x00\x00\x00" # JMP back to where we hijacked from. Index 22-26.
         )
     payload[4:7] = get_loading_ptr()
-    jmp_back = make_jmp_bytes(hijack_ptr+22, ret_ptr+5)
+    jmp_back = make_jmp_bytes(hijack_ptr + len(payload) - 5, ret_ptr)
     payload[22:27] = jmp_back
     # We need to figure out offset for CALL too.
     frame_advance_fn_relative_offset = frame_advance_call[1:]
@@ -138,6 +138,38 @@ def get_offset_after(mem, string):
     if mem.find(string, offset) != -1:
         raise Exception("There are multiple possibilities for where to patch! Aborting")
     return offset
+
+def find_1(find: bytearray):
+    """
+    Find a string of bytes in memory
+    Fails if no matches are found or multiple matches are found
+
+    Args:
+        find (bytearray): The byte string to find
+    Returns:
+        offset (int): The index of the first byte of the byte string
+    """
+    global patched_mem
+    offset = patched_mem.index(find)
+    if patched_mem.find(find, offset) != -1: raise ValueError("Found multiple occurrences")
+    return offset
+
+def replace_1(find: bytearray, replace: bytearray):
+    """
+    Find a string of bytes in memory and replace it with another string of bytes.
+    Fails if no matches are found or multiple matches are found.
+
+    Args:
+        find (bytearray): The byte array to find
+        replace (bytearray): The byte array to replace it with
+    Returns:
+        None
+    Raises:
+        ValueError: If no matches are found or multiple matches are found
+    """
+    global patched_mem
+    offset = find_1(find)
+    patched_mem[offset:offset+len(find)] = replace
 
 def get_relative_offset(start, dest):
     offset = dest - start - JMP_INSTRUCTION_LEN
