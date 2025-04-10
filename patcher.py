@@ -15,7 +15,7 @@ game_folder = "C:/Users/Joseph/Desktop/Ducks/Sitting Ducks EU"
 # MODS
 instant_loading = True
 speed_issue_fix = True
-new_game_plus = False
+new_game_plus = True
 
 def do_instaload_patch():
     """
@@ -29,32 +29,28 @@ def do_instaload_patch():
     Were they making us suffer through 20 second loading screens for no reason?
     """
     global patched_mem
-    cave_mems = {
-        "EU": b'\xff\xff\x5b\x81\xc4\x90\x00\x00\x00\xC3',
-        "PO": b'\xb8\xac\xb4\x5a\x00\xe9\x6b\x2d\xff\xff',
-        "RU": b'\xb8\xac\xb4\x5a\x00\xe9\x6b\x2d\xff\xff',
-        "US04": b'\xff\x25\xa8\x21\x59\x00\xb8\xcc\xa3\x5a\x00\xe9\x8b\x2d\xff\xff',
-        "US05": b'\xff\x25\xa8\x21\x59\x00\xb8\xcc\xa3\x5a\x00\xe9\x8b\x2d\xff\xff',
+    cave_offsets = {
+        "EU": 0x1dcd1c,
+        "PO": 0x1924a0,
+        "RU": 0x1924a0,
+        "US04": 0x191970,
+        "US05": 0x191970,
     }
-    prev_fn_call_mems = {
-        "EU": b'\xff\x52\x24\xE8\xE5\xFD\xFF\xFF',
-        "PO": b'\xff\x52\x24\xE8\xE5\xFD\xFF\xFF',
-        "RU": b'\xff\x52\x24\xE8\xE5\xFD\xFF\xFF',
-        "US04": b'\xff\x52\x24\xE8\xE5\xFD\xFF\xFF',
-        "US05": b'\xff\x52\x24\xE8\xE5\xFD\xFF\xFF',
+    frame_advance_call_offsets = {
+        "EU": 0xc8116,
+        "PO": 0xc8b06,
+        "RU": 0xc8ae6,
+        "US04": 0xc9226,
+        "US05": 0xc9226,
     }
-    cave_mem = cave_mems[game_ver]
-    prev_fn_call_mem = prev_fn_call_mems[game_ver]
-    
-    cave_offset = find_1(cave_mem) + len(cave_mem)
-    frame_advance_call_offset = find_1(prev_fn_call_mem) + len(prev_fn_call_mem) - 5
+    frame_advance_call_offset = frame_advance_call_offsets[game_ver]
+    cave_offset = cave_offsets[game_ver]
+
     frame_advance_call = mem[frame_advance_call_offset:frame_advance_call_offset+5]
     hijack_ptr = translate_to_runtime_offset(cave_offset)
-    ret_ptr = translate_to_runtime_offset(frame_advance_call_offset) + len(frame_advance_call) - 5
-
+    ret_ptr = translate_to_runtime_offset(frame_advance_call_offset)
     # Time to patch!
-    jmp_to_hijack = make_jmp_bytes(ret_ptr, hijack_ptr)
-    patched_mem[frame_advance_call_offset:frame_advance_call_offset+len(jmp_to_hijack)] = jmp_to_hijack
+    
 
     payload = bytearray(
         b"\x60\x9C\x83\x3D"
@@ -62,15 +58,23 @@ def do_instaload_patch():
         b"\x00\x00\x0F\x85\x05\x00\x00\x00"
         b"\xE8\x00\x00\x00\x00" # CALL to original routine. Index 15-19.
         b"\x9D\x61"
-        b"\xE9\x00\x00\x00\x00" # JMP back to where we hijacked from. Index 22-26.
         )
+    
     payload[4:7] = get_loading_ptr()
-    jmp_back = make_jmp_bytes(hijack_ptr + len(payload) - 5, ret_ptr + 5)
-    payload[22:27] = jmp_back
     frame_advance_fn_relative_offset = frame_advance_call[1:]
     frame_advance_fn_offset = get_jmp_destination(int.from_bytes(frame_advance_fn_relative_offset, "little"), ret_ptr)
     call_bytes = make_call_bytes(hijack_ptr + 15, frame_advance_fn_offset)
     payload[15:20] = call_bytes
+    insert_hijack(frame_advance_call_offset, cave_offset, payload)
+
+def insert_hijack(offset, cave_offset, payload):
+    global patched_mem
+    hijack_ptr = translate_to_runtime_offset(cave_offset)
+    ret_ptr = translate_to_runtime_offset(offset)
+    jmp_to_hijack = make_jmp_bytes(ret_ptr, hijack_ptr)
+    patched_mem[offset:offset+len(jmp_to_hijack)] = jmp_to_hijack
+    jmp_back = make_jmp_bytes(hijack_ptr+len(payload)-5, ret_ptr)
+    payload.extend(jmp_back)
     patched_mem[cave_offset:cave_offset+len(payload)] = payload
 
 def do_speed_issue_fix():
