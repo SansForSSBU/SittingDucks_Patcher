@@ -87,7 +87,11 @@ def do_instaload_patch(exe: GameExecutable):
     md = Cs(CS_ARCH_X86, CS_MODE_32)
     jmp_to_hijack, _ = ks.asm(f"JMP {hijack_ptr}", addr=ret_ptr)
     exe.mem[frame_advance_call_offset:frame_advance_call_offset+len(jmp_to_hijack)] = jmp_to_hijack
-
+    
+    md.detail = True
+    frame_advance_fn_offset = list(md.disasm(frame_advance_call, ret_ptr))[0].operands[0].imm
+    jmp_back, _ = ks.asm(f"JMP {ret_ptr+5}", addr=hijack_ptr+22)
+    call_bytes, _ = ks.asm(f"CALL {frame_advance_fn_offset}", addr=hijack_ptr+15)
     payload = bytearray(
         b"\x60\x9C\x83\x3D"
         b"\x00\x00\x00" # Loading pointer. If 0, we are not loading. Index 4-6.
@@ -97,12 +101,7 @@ def do_instaload_patch(exe: GameExecutable):
         b"\xE9\x00\x00\x00\x00" # JMP back to where we hijacked from. Index 22-26.
         )
     payload[4:7] = loading_ptrs[exe.game_ver]
-    jmp_back, _ = ks.asm(f"JMP {ret_ptr+5}", addr=hijack_ptr+22)
     payload[22:27] = jmp_back
-    md.detail = True
-    disasm = md.disasm(frame_advance_call, ret_ptr)
-    frame_advance_fn_offset = list(md.disasm(frame_advance_call, ret_ptr))[0].operands[0].imm
-    call_bytes, _ = ks.asm(f"CALL {frame_advance_fn_offset}", addr=hijack_ptr+15)
     payload[15:20] = call_bytes
     exe.mem[cave_offset:cave_offset+len(payload)] = payload
 
