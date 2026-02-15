@@ -1,5 +1,11 @@
 import argparse
 import pefile
+import hashlib
+
+JMP_OPCODE = 0xE9
+CALL_OPCODE = 0xE8
+NOP_OPCODE = 0x90
+JMP_INSTRUCTION_LEN = 5
 
 def do_instaload_patch():
     global patched_mem
@@ -140,11 +146,6 @@ def pull_mem_map(file_path):
         mem_map.append((memory_offset, file_offset))
     return mem_map
 
-import hashlib
-JMP_OPCODE = 0xE9
-CALL_OPCODE = 0xE8
-NOP_OPCODE = 0x90
-JMP_INSTRUCTION_LEN = 5
 game_vers = {
     b'\x83t\x1e\x0c\x07\xc4\x19\xaf\x14j\xc9Y\xc1\xe6\x81\\': "EU",
     b'\x0e\xc3G\xb6\xa9nP\xa3\xf6\xbcw\xbfgZ\xb1\x93': "PO",
