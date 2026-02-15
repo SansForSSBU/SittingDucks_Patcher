@@ -1,4 +1,5 @@
 import argparse
+import pefile
 
 def do_instaload_patch():
     global patched_mem
@@ -137,6 +138,15 @@ def translate_to_runtime_offset(file_offset):
 def format_bytes(b):
     return ' '.join(r''+hex(letter)[2:] for letter in b)
 
+def pull_mem_map(file_path):
+    pe = pefile.PE(file_path)
+    mem_map = [(0x00400000, 0x0)]
+    for section in pe.sections:
+        file_offset = section.PointerToRawData
+        memory_offset = pe.OPTIONAL_HEADER.ImageBase + section.VirtualAddress
+        mem_map.append((memory_offset, file_offset))
+    return mem_map
+
 import hashlib
 JMP_OPCODE = 0xE9
 CALL_OPCODE = 0xE8
@@ -149,52 +159,6 @@ game_vers = {
     b'\xe8\xd8\xfa5\xff\x9f\xecw\x1b\xfd\xfa\x81\xe1\x0c\xf9\x04': "RU",
     b'\xa4KgS\x7f+\xec\x16#\xa7\x9bx\xc7\x12\xae\x1b': "US04",
     b'\xcf2\xa4\x94\x80-\xdb\x0c\xd3S\xac\xa4\xf6D9\x98': "US05"
-}
-memMaps = {
-    "EU": [
-        (0x00400000, 0x00000000),
-        (0x00401000, 0x00000400),
-        (0x005d9000, 0x001d8400),
-        (0x005da000, 0x001d9400),
-        (0x005dc000, 0x001db400),
-        (0x005dd000, 0x001dc400),
-    ],
-    "PO":
-    [
-        (0x00400000, 0x0),
-        (0x00401000, 0x1000),
-        (0x00593000, 0x193000),
-        (0x005ad000, 0x1ad000),
-        (0x005da000, 0x1c7000),
-        (0x005dd000, 0x1ca000),
-    ],
-    "RU":
-    [
-        (0x00400000, 0x0),
-        (0x00401000, 0x1000),
-        (0x00593000, 0x193000),
-        (0x005ad000, 0x1ad000),
-        (0x005da000, 0x1c7000),
-        (0x005dd000, 0x1ca000),
-    ],
-    "US04":
-    [
-        (0x00400000, 0x0),
-        (0x00401000, 0x1000),
-        (0x00592000, 0x192000),
-        (0x005ac000, 0x1ac000),
-        (0x005d9000, 0x1c6000),
-        (0x005dc000, 0x1c9000)
-    ],
-    "US05":
-    [
-        (0x00400000, 0x0),
-        (0x00401000, 0x1000),
-        (0x00592000, 0x192000),
-        (0x005ac000, 0x1ac000),
-        (0x005d9000, 0x1c6000),
-        (0x005dc000, 0x1c9000)
-    ],
 }
 
 def get_hash(file_path):
@@ -220,10 +184,10 @@ def main():
     parser.add_argument("--speedfix", action="store_true", help="Speed fix")
     parser.add_argument("--newgameplus", action="store_true", help="New game plus")
     args = parser.parse_args()
+    memMap = pull_mem_map(args.in_path)
     f = open(args.in_path, "rb")
     mem = f.read()
     game_ver = get_file_hash(args.in_path)
-    memMap = memMaps[game_ver]
     patched_mem = bytearray(mem)
 
     if args.instaload: do_instaload_patch()
