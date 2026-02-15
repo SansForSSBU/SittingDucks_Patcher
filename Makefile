@@ -17,5 +17,5 @@ test: setup
 
 .PHONY: install_global
 install:
-	sudo apt install pipx
+	sudo apt install -y pipx
 	pipx install .
