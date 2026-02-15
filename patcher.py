@@ -2,7 +2,7 @@ import argparse
 import pefile
 import hashlib
 import struct
-import keystone
+from keystone import Ks, KS_ARCH_X86, KS_MODE_32
 
 JMP_OPCODE = 0xE9
 CALL_OPCODE = 0xE8
@@ -87,7 +87,8 @@ def do_instaload_patch(exe: GameExecutable):
     ret_ptr = FileOffset(frame_advance_call_offset).to_runtime_offset(exe).value
 
     # Time to patch!
-    jmp_to_hijack = jmp_call_common(JMP_OPCODE, ret_ptr, hijack_ptr)
+    ks = Ks(KS_ARCH_X86, KS_MODE_32)
+    jmp_to_hijack, _ = ks.asm(f"JMP {hijack_ptr}", addr=ret_ptr)
     exe.mem[frame_advance_call_offset:frame_advance_call_offset+len(jmp_to_hijack)] = jmp_to_hijack
 
     payload = bytearray(
