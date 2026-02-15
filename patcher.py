@@ -138,18 +138,6 @@ def do_ngplus_mod(exe):
     offset = offsets[exe.game_ver]
     exe.mem[offset] = 0x20
 
-def get_relative_offset(start, dest):
-    return (dest - start - JMP_INSTRUCTION_LEN) % 0x100000000
-
-
-def jmp_call_common(opcode, start, dest):
-    offset = get_relative_offset(start, dest)
-    args = offset.to_bytes(4, 'little')
-    instr = bytearray(opcode.to_bytes(1, "little"))
-    instr.extend(bytearray(args))
-    a = bytes(instr)
-    return a
-
 def get_objective_offset(location, relative_offset):
     return (location + relative_offset + 5) % 0x100000000
 
