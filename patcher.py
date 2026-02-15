@@ -86,8 +86,9 @@ def do_instaload_patch(exe: GameExecutable):
         "US04": 0x5c2b9c,
         "US05": 0x5c2b9c
     }
+
     a = loading_ptrs_hex[exe.game_ver]
-    payload2_asm = f"""
+    payload_asm = f"""
         pushal
         pushfd
         cmp dword ptr [{a:#x}], 0
@@ -98,8 +99,8 @@ def do_instaload_patch(exe: GameExecutable):
         popal
         jmp {ret_ptr+5:#x}
     """
-    asm, _ = ks.asm(payload2_asm, addr=hijack_ptr)
-    exe.mem[cave_offset:cave_offset+len(asm)] = asm
+    payload, _ = ks.asm(payload_asm, addr=hijack_ptr)
+    exe.mem[cave_offset:cave_offset+len(payload)] = payload
 
     jmp_to_hijack, _ = ks.asm(f"JMP {hijack_ptr}", addr=ret_ptr)
     exe.mem[frame_advance_call_offset:frame_advance_call_offset+len(jmp_to_hijack)] = jmp_to_hijack
