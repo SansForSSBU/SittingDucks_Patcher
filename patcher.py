@@ -45,7 +45,7 @@ def do_instaload_patch():
     payload[15:20] = call_bytes
     patched_mem[cave_offset:cave_offset+len(payload)] = payload
 
-def do_speed_issue_fix():
+def lock_fdelta_mod():
     global patched_mem
     find1 = b"\x32\xd2\xd9" 
     find2 = b"\x88\x51\x1c\xc7" 
@@ -62,11 +62,8 @@ def do_speed_issue_fix():
     # Change FSTP which was storing fdelta somewhere it's used to store it in an unused place in memory.
     patched_mem[x+2:x+6] = dump_addr
     # Change the 0.33333 to 0.166666
-    y = get_offset_after(mem, find2) - 1
-    patched_mem[y+6] = 0x89
-    patched_mem[y+7] = 0x88
-    patched_mem[y+8] = 0x88
-    patched_mem[y+9] = 0x3c
+    y = get_offset_after(mem, find2)
+    patched_mem[y+5:y+9] = bytes.fromhex("89 88 88 3c")
 
 def do_ngplus_mod():
     global patched_mem
@@ -182,7 +179,7 @@ def main():
     patched_mem = bytearray(mem)
 
     if args.instaload: do_instaload_patch()
-    if args.speedfix: do_speed_issue_fix()
+    if args.speedfix: lock_fdelta_mod()
     if args.newgameplus: do_ngplus_mod()
 
     with open(args.out_path, "wb") as f:
