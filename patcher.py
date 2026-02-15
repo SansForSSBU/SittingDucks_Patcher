@@ -100,7 +100,8 @@ def do_instaload_patch(exe: GameExecutable):
         b"\xE9\x00\x00\x00\x00" # JMP back to where we hijacked from. Index 22-26.
         )
     payload[4:7] = loading_ptrs[exe.game_ver]
-    jmp_back = ks.asm(f"JMP {ret_ptr+5}", addr=hijack_ptr+22)
+    jmp_back, _ = ks.asm(f"JMP {ret_ptr+5}", addr=hijack_ptr+22)
+    # jmp_back = jmp_call_common(JMP_OPCODE, hijack_ptr+22, ret_ptr+5)
     payload[22:27] = jmp_back
     # We need to figure out offset for CALL too.
     frame_advance_fn_relative_offset = frame_advance_call[1:]
