@@ -4,11 +4,6 @@ import hashlib
 import struct
 from keystone import Ks, KS_ARCH_X86, KS_MODE_32
 
-JMP_OPCODE = 0xE9
-CALL_OPCODE = 0xE8
-NOP_OPCODE = 0x90
-JMP_INSTRUCTION_LEN = 5
-
 class Offset:
     def __init__(self, value: int):
         self.value = value
