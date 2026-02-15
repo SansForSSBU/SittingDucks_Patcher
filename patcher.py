@@ -30,7 +30,7 @@ class Landmark:
 
         if mem.find(self.landmark_bytes, offset) != -1:
             raise Exception("There are multiple possibilities for where to patch! Aborting")
-        return Offset(offset)
+        return Offset(offset + self.offset)
 
 class GameExecutable:
     game_vers = {
