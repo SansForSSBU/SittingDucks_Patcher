@@ -2,6 +2,7 @@ import argparse
 import pefile
 import hashlib
 import struct
+import keystone
 
 JMP_OPCODE = 0xE9
 CALL_OPCODE = 0xE8
