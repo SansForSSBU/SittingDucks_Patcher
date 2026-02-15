@@ -12,7 +12,12 @@ class Offset:
     def __init__(self, value: int):
         self.value = value
 class FileOffset(Offset):
-    pass
+    def to_runtime_offset(self, exe):
+        for idx, thing in enumerate(exe.memMap):
+            if idx == 0: continue
+            prev = exe.memMap[idx-1]
+            if (self.value < thing[1] or idx+1 == len(exe.memMap)) and (self.value > prev[1]):
+                return RuntimeOffset(self.value - prev[1] + prev[0])
 
 class RuntimeOffset(Offset):
     pass
@@ -77,8 +82,8 @@ def do_instaload_patch(exe: GameExecutable):
     frame_advance_call_offset = Landmark(b'\xff\x52\x24\xE8\xE5\xFD\xFF\xFF', -5).to_offset(exe.mem).value
     cave_offset = cave_offsets[exe.game_ver]
     frame_advance_call = exe.mem[frame_advance_call_offset:frame_advance_call_offset+5]
-    hijack_ptr = translate_to_runtime_offset(cave_offset, exe)
-    ret_ptr = translate_to_runtime_offset(frame_advance_call_offset, exe)
+    hijack_ptr = FileOffset(cave_offset).to_runtime_offset(exe).value
+    ret_ptr = FileOffset(frame_advance_call_offset).to_runtime_offset(exe).value
 
     # Time to patch!
     jmp_to_hijack = make_jmp_bytes(ret_ptr, hijack_ptr)
@@ -154,13 +159,6 @@ def make_call_bytes(start, dest):
 
 def get_objective_offset(location, relative_offset):
     return (location + relative_offset + 5) % 0x100000000
-
-def translate_to_runtime_offset(file_offset, exe):
-    for idx, thing in enumerate(exe.memMap):
-        if idx == 0: continue
-        prev = exe.memMap[idx-1]
-        if (file_offset < thing[1] or idx+1 == len(exe.memMap)) and (file_offset > prev[1]):
-            return file_offset - prev[1] + prev[0]
 
 # TODO: Move into utility file
 def get_hash(file_path):
