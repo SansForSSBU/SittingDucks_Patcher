@@ -139,20 +139,19 @@ def do_ngplus_mod(exe):
 def get_relative_offset(start, dest):
     return (dest - start - JMP_INSTRUCTION_LEN) % 0x100000000
 
-def make_jmp_bytes(start, dest):
+
+def jmp_call_common(opcode, start, dest):
     offset = get_relative_offset(start, dest)
-    jmp_args = offset.to_bytes(4, 'little')
-    instr = bytearray(JMP_OPCODE.to_bytes(1, 'little'))
-    instr.extend(bytearray(jmp_args))
-    instr = bytes(instr)
-    return instr
+    args = offset.to_bytes(4, 'little')
+    instr = bytearray(opcode.to_bytes(1, "little"))
+    instr.extend(bytearray(args))
+    return bytes(instr)
+
+def make_jmp_bytes(start, dest):
+    return jmp_call_common(JMP_OPCODE, start, dest)
 
 def make_call_bytes(start, dest):
-    offset = get_relative_offset(start, dest)
-    call_args = offset.to_bytes(4, 'little')
-    instr = bytearray(CALL_OPCODE.to_bytes(1, 'little'))
-    instr.extend(bytearray(call_args))
-    return instr
+    return jmp_call_common(CALL_OPCODE, start, dest)
 
 def get_objective_offset(location, relative_offset):
     return (location + relative_offset + 5) % 0x100000000
