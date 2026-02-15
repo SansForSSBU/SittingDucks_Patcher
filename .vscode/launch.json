@@ -1,0 +1,32 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+
+        {
+            "name": "Python Debugger: Current File",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/patcher.py",
+            "args": ["test/game_exes/${input:gameVersion}", "test/tmp/overlay.exe", "--instaload", "--speedfix", "--newgameplus"],
+            "console": "integratedTerminal"
+        }
+    ],
+    "inputs": [
+        {
+            "id": "gameVersion",
+            "type": "pickString",
+            "description": "Select run mode",
+            "options": [
+                "EU/overlay.exe",
+                "PO/OVERLAY.exe",
+                "RU/OVERLAY.exe",
+                "US04/overlay.exe",
+                "US05/overlay.exe"
+            ],
+            "default": "EU"
+        }
+    ]
+}

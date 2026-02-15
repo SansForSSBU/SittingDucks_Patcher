@@ -1,126 +1,134 @@
-"""
---- INSTRUCTIONS ---
-Set game_folder to the path to your game's folder.
-Set instant_loading, speed_issue_fix and new_game_plus to True if you want them enabled, False if you don't.
-Once you've set everything, run the script. It will automatically create a backup and overwrite overlay.exe.
-You should now be able to launch overlay.exe and the mods you've chosen will be active.
-
-NOTE: If using speed issue fix, you must cap the framerate to 60 via an external program such as DxWnd or the game will run incredibly fast.
-Make sure the game is actually running at 60FPS
-If it's running slower despite you setting the frame limiter in DxWnd, try enabling Kill D3D Vsync in DxWnd.
-NOTE: Speedruns must use instant_loading and speed_issue_fix
-"""
-
 import argparse
+import pefile
+import hashlib
+import struct
+from keystone import *
+from capstone import Cs, CS_ARCH_X86, CS_MODE_32
 
-game_folder = "C:/Users/Joseph/Desktop/Ducks/Sitting Ducks EU"
-# MODS
-instant_loading = True
-speed_issue_fix = True
-new_game_plus = False
+class Offset:
+    def __init__(self, value: int):
+        self.value = value
+class FileOffset(Offset):
+    def to_runtime_offset(self, exe):
+        for idx, thing in enumerate(exe.memMap):
+            if idx == 0: continue
+            prev = exe.memMap[idx-1]
+            if (self.value < thing[1] or idx+1 == len(exe.memMap)) and (self.value > prev[1]):
+                return RuntimeOffset(self.value - prev[1] + prev[0])
 
-def do_instaload_patch():
-    """
-    Instant loading patch.
-    This patch inserts a hijack into a place where normally a function which seems to advance a frame would be called.
-    If the game is not loading, it just calls the frame advance function as normal.
-    If the game is currently loading, it skips the call to the frame advance function.
-    This effectively forces the game to load in 1 frame. 
-    On modern hardware, this frame still happens so fast you don't even notice.
-    I wonder how this would perform on original hardware (a PS2?) 
-    Were they making us suffer through 20 second loading screens for no reason?
-    """
-    global patched_mem
-    cave_mems = {
-        "EU": b'\xff\xff\x5b\x81\xc4\x90\x00\x00\x00\xC3',
-        "PO": b'\xb8\xac\xb4\x5a\x00\xe9\x6b\x2d\xff\xff',
-        "RU": b'\xb8\xac\xb4\x5a\x00\xe9\x6b\x2d\xff\xff',
-        "US04": b'\xff\x25\xa8\x21\x59\x00\xb8\xcc\xa3\x5a\x00\xe9\x8b\x2d\xff\xff',
-        "US05": b'\xff\x25\xa8\x21\x59\x00\xb8\xcc\xa3\x5a\x00\xe9\x8b\x2d\xff\xff',
+class RuntimeOffset(Offset):
+    pass
+
+class Landmark:
+    def __init__(self, landmark_bytes, offset):
+        self.landmark_bytes = landmark_bytes
+        self.offset = offset
+
+    def to_offset(self, mem):
+        offset = mem.find(self.landmark_bytes)
+        if offset == -1:
+            raise Exception("Could not find memory we expected to find")
+        offset += len(self.landmark_bytes)
+
+        if mem.find(self.landmark_bytes, offset) != -1:
+            raise Exception("There are multiple possibilities for where to patch! Aborting")
+        return Offset(offset + self.offset)
+
+class GameExecutable:
+    game_vers = {
+        b'\x83t\x1e\x0c\x07\xc4\x19\xaf\x14j\xc9Y\xc1\xe6\x81\\': "EU",
+        b'\x0e\xc3G\xb6\xa9nP\xa3\xf6\xbcw\xbfgZ\xb1\x93': "PO",
+        b'\xe8\xd8\xfa5\xff\x9f\xecw\x1b\xfd\xfa\x81\xe1\x0c\xf9\x04': "RU",
+        b'\xa4KgS\x7f+\xec\x16#\xa7\x9bx\xc7\x12\xae\x1b': "US04",
+        b'\xcf2\xa4\x94\x80-\xdb\x0c\xd3S\xac\xa4\xf6D9\x98': "US05"
     }
-    prev_fn_call_mems = {
-        "EU": b'\xff\x52\x24\xE8\xE5\xFD\xFF\xFF',
-        "PO": b'\xff\x52\x24\xE8\xE5\xFD\xFF\xFF',
-        "RU": b'\xff\x52\x24\xE8\xE5\xFD\xFF\xFF',
-        "US04": b'\xff\x52\x24\xE8\xE5\xFD\xFF\xFF',
-        "US05": b'\xff\x52\x24\xE8\xE5\xFD\xFF\xFF',
+    def _get_mem_map(self, file_path):
+        pe = pefile.PE(file_path)
+        mem_map = [(0x00400000, 0x0)]
+        for section in pe.sections:
+            file_offset = section.PointerToRawData
+            memory_offset = pe.OPTIONAL_HEADER.ImageBase + section.VirtualAddress
+            mem_map.append((memory_offset, file_offset))
+        return mem_map
+
+    def __init__(self, path):
+        self.memMap = self._get_mem_map(path)
+        self.game_ver = self.game_vers[get_hash(path)]
+        with open(path, "rb") as f:
+            self.mem = bytearray(f.read())
+
+    def write_to(self, path):
+        with open(path, "wb") as f:
+            f.write(self.mem)
+
+def do_instaload_patch(exe: GameExecutable):
+    cave_offsets = {
+        "EU": 0x1dcd1c,
+        "PO": 0x1924a0,
+        "RU": 0x1924a0,
+        "US04": 0x191970,
+        "US05": 0x191970,
     }
-    cave_mem = cave_mems[game_ver]
-    prev_fn_call_mem = prev_fn_call_mems[game_ver]
-    
-    cave_offset = get_offset_after(mem, cave_mem)
-    frame_advance_call_offset = get_offset_after(mem, prev_fn_call_mem) - 5
-    frame_advance_call = mem[frame_advance_call_offset:frame_advance_call_offset+5]
-    hijack_ptr = translate_to_runtime_offset(cave_offset)
-    ret_ptr = translate_to_runtime_offset(frame_advance_call_offset)
+    loading_ptrs_hex = {
+        "EU": 0x5c2b9c,
+        "PO": 0x5c3bdc,
+        "RU": 0x5c3bdc,
+        "US04": 0x5c2b9c,
+        "US05": 0x5c2b9c
+    }
 
-    # Time to patch!
-    jmp_to_hijack = make_jmp_bytes(ret_ptr, hijack_ptr)
-    patched_mem[frame_advance_call_offset:frame_advance_call_offset+len(jmp_to_hijack)] = jmp_to_hijack
+    cave_offset = cave_offsets[exe.game_ver]
+    frame_advance_call_offset = Landmark(b'\xff\x52\x24\xE8\xE5\xFD\xFF\xFF', -5).to_offset(exe.mem).value
+    frame_advance_call = exe.mem[frame_advance_call_offset:frame_advance_call_offset+5]
+    hijack_ptr = FileOffset(cave_offset).to_runtime_offset(exe).value
+    ret_ptr = FileOffset(frame_advance_call_offset).to_runtime_offset(exe).value
+    ks = Ks(KS_ARCH_X86, KS_MODE_32)
+    md = Cs(CS_ARCH_X86, CS_MODE_32)
 
-    payload = bytearray(
-        b"\x60\x9C\x83\x3D"
-        b"\x00\x00\x00" # Loading pointer. If 0, we are not loading. Index 4-6.
-        b"\x00\x00\x0F\x85\x05\x00\x00\x00"
-        b"\xE8\x00\x00\x00\x00" # CALL to original routine. Index 15-19.
-        b"\x9D\x61"
-        b"\xE9\x00\x00\x00\x00" # JMP back to where we hijacked from. Index 22-26.
-        )
-    payload[4:7] = get_loading_ptr()
-    jmp_back = make_jmp_bytes(hijack_ptr+22, ret_ptr+5)
-    payload[22:27] = jmp_back
-    # We need to figure out offset for CALL too.
-    frame_advance_fn_relative_offset = frame_advance_call[1:]
-    frame_advance_fn_offset = get_objective_offset(int.from_bytes(frame_advance_fn_relative_offset, "little"), ret_ptr)
-    call_bytes = make_call_bytes(hijack_ptr + 15, frame_advance_fn_offset)
-    payload[15:20] = call_bytes
-    patched_mem[cave_offset:cave_offset+len(payload)] = payload
+    md.detail = True
+    frame_advance_fn_offset = list(md.disasm(frame_advance_call, ret_ptr))[0].operands[0].imm
 
-def do_speed_issue_fix():
+    a = loading_ptrs_hex[exe.game_ver]
+    payload_asm = f"""
+        pushal
+        pushfd
+        cmp dword ptr [{a:#x}], 0
+        .byte 0x0F, 0x85, 0x05, 0x00, 0x00, 0x00
+        call {frame_advance_fn_offset:#x}
+        popfd
+        popal
+        jmp {ret_ptr+5:#x}
     """
-    Speed issue fix
-    Due to a bizarre quirk with how the game determines how long ago the last frame (fdelta) was which I still don't understand
-    the game would run at inconsistent speeds. Usually this was 98-107% of the normal game speed.
-    We have seen the game running as fast as 110% of it's normal speed though this was a one-off anomaly.
-    This happens when capping FPS at 60 via dxwnd.
-    This patch fixes the issue by preventing the game from storing its best guess of how long it's been since the last frame into fdelta
-    The game also sets this to 0.033333 in some places (the developers probably forgot to remove these instructions when porting from the PS2 where the intended FPS was 30FPS). This patch nops out the instruction which do that too.
-    By a lucky coincidence, fdelta is initialised to 0.016666 (60fps) on startup, so no need to change that :)
-    """
-    global patched_mem
-    find1 = b"\x32\xd2\xd9" 
-    find2 = b"\x88\x51\x1c\xc7" 
-    x = get_offset_after(mem, find1) - 1
+    payload, _ = ks.asm(payload_asm, addr=hijack_ptr)
+    exe.mem[cave_offset:cave_offset+len(payload)] = payload
+
+    jmp_to_hijack, _ = ks.asm(f"JMP {hijack_ptr}", addr=ret_ptr)
+    exe.mem[frame_advance_call_offset:frame_advance_call_offset+len(jmp_to_hijack)] = jmp_to_hijack
+
+def print_asm(asm, addr):
+    md = Cs(CS_ARCH_X86, CS_MODE_32)
+    for instr in md.disasm(asm, addr):
+        print(instr)
+
+def lock_fdelta_mod(exe: GameExecutable, fdelta=0.016666668):
+    fdelta_update_offset = Landmark(b"\x32\xd2\xd9", 1).to_offset(exe.mem).value
+    fdelta_offset = Landmark(b"\x88\x51\x1c\xc7", 5).to_offset(exe.mem).value
     dump_addrs = {
         "US05": 0x005c5f00,
         "US04": 0x005c5f00,
         "EU": 0x005ddf00,
         "RU": 0x005c6f00,
         "PO": 0x005c6f00,
-
     }
-    dump_addr = dump_addrs[game_ver].to_bytes(4, 'little')
-    # Change FSTP which was storing fdelta somewhere it's used to store it in an unused place in memory.
-    patched_mem[x+2:x+6] = dump_addr
-    # Change the 0.33333 to 0.166666
-    y = get_offset_after(mem, find2) - 1
-    patched_mem[y+6] = 0x89
-    patched_mem[y+7] = 0x88
-    patched_mem[y+8] = 0x88
-    patched_mem[y+9] = 0x3c
+    dump_addr = dump_addrs[exe.game_ver].to_bytes(4, 'little')
 
-def do_ngplus_mod():
-    """
-    New game plus mod
-    Makes you start the game with all items
-    Patches an instruction which was setting whether you had the item at the start of the game to 0.
-    It was moving BL (lower part of B register, which is 0 in this case) into the flag.
-    I patched it so it moves AH (upper part of A register) in.
-    This actually sets whether you have the item to a number greater than 1, which is not normal.
-    But any value except 0 counts as having the item, so it works :)
-    
-    """
-    global patched_mem
+    # Make code which was updating fdelta to enforce the variable framerate instead put fdelta somewhere unused.
+    exe.mem[fdelta_update_offset:fdelta_update_offset+4] = dump_addr
+
+    # Change fdelta initialization value to the desired value
+    exe.mem[fdelta_offset:fdelta_offset+4] = struct.pack('<f', fdelta)
+
+def do_ngplus_mod(exe):
     offsets = {
         "EU": 0x93C3E,
         "RU": 0x947DE,
@@ -128,159 +136,32 @@ def do_ngplus_mod():
         "US04": 0x94D3A,
         "US05": 0x94D3A,
     }
-    offset = offsets[game_ver]
-    patched_mem[offset] = 0x20
+    offset = offsets[exe.game_ver]
+    exe.mem[offset] = 0x20
 
-def get_offset_after(mem, string):
-    offset = mem.find(string)
-    if offset == -1:
-        raise Exception("Could not find memory we expected to find")
-    offset += len(string)
-
-    if mem.find(string, offset) != -1:
-        raise Exception("There are multiple possibilities for where to patch! Aborting")
-    return offset
-
-def get_relative_offset(start, dest):
-    offset = dest - start - JMP_INSTRUCTION_LEN
-    if offset < 0:
-        offset += 0x100000000
-    return offset
-
-def make_jmp_bytes(start, dest):
-    offset = get_relative_offset(start, dest)
-    jmp_args = offset.to_bytes(4, 'little')
-    instr = bytearray(JMP_OPCODE.to_bytes(1, 'little'))
-    instr.extend(bytearray(jmp_args))
-    instr = bytes(instr)
-    return instr
-
-def make_call_bytes(start, dest):
-    offset = get_relative_offset(start, dest)
-    call_args = offset.to_bytes(4, 'little')
-    instr = bytearray(CALL_OPCODE.to_bytes(1, 'little'))
-    instr.extend(bytearray(call_args))
-    return instr
-
-def get_loading_ptr():
-    global game_ver
-    if game_ver == "EU":
-        return bytearray(b"\x9C\x2B\x5C")
-    elif game_ver == "PO" or game_ver == 'RU':
-        return bytearray(b"\xDC\x3B\x5C")
-    elif game_ver == "US04" or game_ver == "US05":
-        return bytearray(b"\x9C\x2B\x5C")
-    else:
-        raise Exception("Unrecognised game version!")
-
-def get_objective_offset(location, relative_offset):
-    return (location + relative_offset + 5) % 0x100000000
-
-def translate_to_runtime_offset(file_offset):
-    for idx, thing in enumerate(memMap):
-        if idx == 0: continue
-        prev = memMap[idx-1]
-        if (file_offset < thing[1] or idx+1 == len(memMap)) and (file_offset > prev[1]):
-            return file_offset - prev[1] + prev[0]
-
-def format_bytes(b):
-    return ' '.join(r''+hex(letter)[2:] for letter in b)
-
-import hashlib
-JMP_OPCODE = 0xE9
-CALL_OPCODE = 0xE8
-NOP_OPCODE = 0x90
-JMP_INSTRUCTION_LEN = 5
-# TODO: Pull mem map out the same way Ghidra does it...
-game_vers = {
-    b'\x83t\x1e\x0c\x07\xc4\x19\xaf\x14j\xc9Y\xc1\xe6\x81\\': "EU",
-    b'\x0e\xc3G\xb6\xa9nP\xa3\xf6\xbcw\xbfgZ\xb1\x93': "PO",
-    b'\xe8\xd8\xfa5\xff\x9f\xecw\x1b\xfd\xfa\x81\xe1\x0c\xf9\x04': "RU",
-    b'\xa4KgS\x7f+\xec\x16#\xa7\x9bx\xc7\x12\xae\x1b': "US04",
-    b'\xcf2\xa4\x94\x80-\xdb\x0c\xd3S\xac\xa4\xf6D9\x98': "US05"
-}
-memMaps = {
-    "EU": [
-        (0x00400000, 0x00000000),
-        (0x00401000, 0x00000400),
-        (0x005d9000, 0x001d8400),
-        (0x005da000, 0x001d9400),
-        (0x005dc000, 0x001db400),
-        (0x005dd000, 0x001dc400),
-    ],
-    "PO":
-    [
-        (0x00400000, 0x0),
-        (0x00401000, 0x1000),
-        (0x00593000, 0x193000),
-        (0x005ad000, 0x1ad000),
-        (0x005da000, 0x1c7000),
-        (0x005dd000, 0x1ca000),
-    ],
-    "RU":
-    [
-        (0x00400000, 0x0),
-        (0x00401000, 0x1000),
-        (0x00593000, 0x193000),
-        (0x005ad000, 0x1ad000),
-        (0x005da000, 0x1c7000),
-        (0x005dd000, 0x1ca000),
-    ],
-    "US04":
-    [
-        (0x00400000, 0x0),
-        (0x00401000, 0x1000),
-        (0x00592000, 0x192000),
-        (0x005ac000, 0x1ac000),
-        (0x005d9000, 0x1c6000),
-        (0x005dc000, 0x1c9000)
-    ],
-    "US05":
-    [
-        (0x00400000, 0x0),
-        (0x00401000, 0x1000),
-        (0x00592000, 0x192000),
-        (0x005ac000, 0x1ac000),
-        (0x005d9000, 0x1c6000),
-        (0x005dc000, 0x1c9000)
-    ],
-}
-
+# TODO: Move into utility file
 def get_hash(file_path):
     with open(file_path, "rb") as f:
         return hashlib.file_digest(f, "md5").digest()
 
-def get_file_hash(file_path):
-    return game_vers[get_hash(file_path)]
-
-game_ver = None
-mem = None
-memMap = None
-patched_mem = None
-def main():
-    global game_ver
-    global mem
-    global memMap
-    global patched_mem
+def parse_CLI():
     parser = argparse.ArgumentParser(description="SittingDucks_Patcher")
     parser.add_argument("in_path", type=str, help="In path")
     parser.add_argument("out_path", type=str, help="Out path")
     parser.add_argument("--instaload", action="store_true", help="Instaload")
     parser.add_argument("--speedfix", action="store_true", help="Speed fix")
     parser.add_argument("--newgameplus", action="store_true", help="New game plus")
-    args = parser.parse_args()
-    f = open(args.in_path, "rb")
-    mem = f.read()
-    game_ver = get_file_hash(args.in_path)
-    memMap = memMaps[game_ver]
-    patched_mem = bytearray(mem)
+    return parser.parse_args()
 
-    if args.instaload: do_instaload_patch()
-    if args.speedfix: do_speed_issue_fix()
-    if args.newgameplus: do_ngplus_mod()
+def main():
+    args = parse_CLI()
+    exe = GameExecutable(args.in_path)
 
-    with open(args.out_path, "wb") as f:
-        f.write(patched_mem)
+    if args.instaload: do_instaload_patch(exe)
+    if args.speedfix: lock_fdelta_mod(exe)
+    if args.newgameplus: do_ngplus_mod(exe)
+
+    exe.write_to(args.out_path)
 
 if __name__ == "__main__":
     main()
