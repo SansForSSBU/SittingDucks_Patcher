@@ -10,18 +10,11 @@ def do_instaload_patch():
         "US04": b'\xff\x25\xa8\x21\x59\x00\xb8\xcc\xa3\x5a\x00\xe9\x8b\x2d\xff\xff',
         "US05": b'\xff\x25\xa8\x21\x59\x00\xb8\xcc\xa3\x5a\x00\xe9\x8b\x2d\xff\xff',
     }
-    prev_fn_call_mems = {
-        "EU": b'\xff\x52\x24\xE8\xE5\xFD\xFF\xFF',
-        "PO": b'\xff\x52\x24\xE8\xE5\xFD\xFF\xFF',
-        "RU": b'\xff\x52\x24\xE8\xE5\xFD\xFF\xFF',
-        "US04": b'\xff\x52\x24\xE8\xE5\xFD\xFF\xFF',
-        "US05": b'\xff\x52\x24\xE8\xE5\xFD\xFF\xFF',
-    }
+    prev_fn_call_landmark = b'\xff\x52\x24\xE8\xE5\xFD\xFF\xFF'
     cave_mem = cave_mems[game_ver]
-    prev_fn_call_mem = prev_fn_call_mems[game_ver]
     
     cave_offset = get_offset_after(mem, cave_mem)
-    frame_advance_call_offset = get_offset_after(mem, prev_fn_call_mem) - 5
+    frame_advance_call_offset = get_offset_after(mem, prev_fn_call_landmark) - 5
     frame_advance_call = mem[frame_advance_call_offset:frame_advance_call_offset+5]
     hijack_ptr = translate_to_runtime_offset(cave_offset)
     ret_ptr = translate_to_runtime_offset(frame_advance_call_offset)
@@ -152,7 +145,6 @@ JMP_OPCODE = 0xE9
 CALL_OPCODE = 0xE8
 NOP_OPCODE = 0x90
 JMP_INSTRUCTION_LEN = 5
-# TODO: Pull mem map out the same way Ghidra does it...
 game_vers = {
     b'\x83t\x1e\x0c\x07\xc4\x19\xaf\x14j\xc9Y\xc1\xe6\x81\\': "EU",
     b'\x0e\xc3G\xb6\xa9nP\xa3\xf6\xbcw\xbfgZ\xb1\x93': "PO",
