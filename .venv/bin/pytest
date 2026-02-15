@@ -1,0 +1,6 @@
+#!/home/joseph/dropbox/dont_wanna_download/repos/SittingDucks_Patcher/.venv/bin/python3
+import sys
+from pytest import console_main
+if __name__ == '__main__':
+    sys.argv[0] = sys.argv[0].removesuffix('.exe')
+    sys.exit(console_main())
