@@ -1,0 +1,5 @@
+pytest
+pefile
+keystone-engine
+capstone
+ruff
