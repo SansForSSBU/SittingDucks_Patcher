@@ -69,29 +69,16 @@ def do_instaload_patch(exe: GameExecutable):
         "US04": 0x191970,
         "US05": 0x191970,
     }
-    loading_ptrs = {
-        "EU": bytearray(b"\x9C\x2B\x5C"),
-        "PO": bytearray(b"\xDC\x3B\x5C"),
-        "RU": bytearray(b"\xDC\x3B\x5C"),
-        "US04": bytearray(b"\x9C\x2B\x5C"),
-        "US05": bytearray(b"\x9C\x2B\x5C")
-    }
-    frame_advance_call_offset = Landmark(b'\xff\x52\x24\xE8\xE5\xFD\xFF\xFF', -5).to_offset(exe.mem).value
     cave_offset = cave_offsets[exe.game_ver]
+    frame_advance_call_offset = Landmark(b'\xff\x52\x24\xE8\xE5\xFD\xFF\xFF', -5).to_offset(exe.mem).value
     frame_advance_call = exe.mem[frame_advance_call_offset:frame_advance_call_offset+5]
     hijack_ptr = FileOffset(cave_offset).to_runtime_offset(exe).value
     ret_ptr = FileOffset(frame_advance_call_offset).to_runtime_offset(exe).value
-
-    # Time to patch!
     ks = Ks(KS_ARCH_X86, KS_MODE_32)
     md = Cs(CS_ARCH_X86, CS_MODE_32)
-    jmp_to_hijack, _ = ks.asm(f"JMP {hijack_ptr}", addr=ret_ptr)
-    exe.mem[frame_advance_call_offset:frame_advance_call_offset+len(jmp_to_hijack)] = jmp_to_hijack
     
     md.detail = True
     frame_advance_fn_offset = list(md.disasm(frame_advance_call, ret_ptr))[0].operands[0].imm
-    jmp_back, _ = ks.asm(f"JMP {ret_ptr+5}", addr=hijack_ptr+22)
-    call_bytes, _ = ks.asm(f"CALL {frame_advance_fn_offset}", addr=hijack_ptr+15)
     loading_ptrs_hex = {
         "EU": 0x5c2b9c,
         "PO": 0x5c3bdc,
@@ -113,6 +100,9 @@ def do_instaload_patch(exe: GameExecutable):
     """
     asm, _ = ks.asm(payload2_asm, addr=hijack_ptr)
     exe.mem[cave_offset:cave_offset+len(asm)] = asm
+
+    jmp_to_hijack, _ = ks.asm(f"JMP {hijack_ptr}", addr=ret_ptr)
+    exe.mem[frame_advance_call_offset:frame_advance_call_offset+len(jmp_to_hijack)] = jmp_to_hijack
 
 def print_asm(asm, addr):
     md = Cs(CS_ARCH_X86, CS_MODE_32)
