@@ -44,6 +44,13 @@ def do_instaload_patch(exe: GameExecutable):
         "US04": 0x191970,
         "US05": 0x191970,
     }
+    loading_ptrs = {
+        "EU": bytearray(b"\x9C\x2B\x5C"),
+        "PO": bytearray(b"\xDC\x3B\x5C"),
+        "RU": bytearray(b"\xDC\x3B\x5C"),
+        "US04": bytearray(b"\x9C\x2B\x5C"),
+        "US05": bytearray(b"\x9C\x2B\x5C")
+    }
     frame_advance_call_offset = Landmark(b'\xff\x52\x24\xE8\xE5\xFD\xFF\xFF', -5).to_offset(exe.mem).value
     cave_offset = cave_offsets[exe.game_ver]
     frame_advance_call = exe.mem[frame_advance_call_offset:frame_advance_call_offset+5]
@@ -62,7 +69,7 @@ def do_instaload_patch(exe: GameExecutable):
         b"\x9D\x61"
         b"\xE9\x00\x00\x00\x00" # JMP back to where we hijacked from. Index 22-26.
         )
-    payload[4:7] = get_loading_ptr(exe)
+    payload[4:7] = loading_ptrs[exe.game_ver]
     jmp_back = make_jmp_bytes(hijack_ptr+22, ret_ptr+5)
     payload[22:27] = jmp_back
     # We need to figure out offset for CALL too.
@@ -133,17 +140,6 @@ def make_call_bytes(start, dest):
     instr = bytearray(CALL_OPCODE.to_bytes(1, 'little'))
     instr.extend(bytearray(call_args))
     return instr
-
-def get_loading_ptr(exe):
-
-    if exe.game_ver == "EU":
-        return bytearray(b"\x9C\x2B\x5C")
-    elif exe.game_ver == "PO" or exe.game_ver == 'RU':
-        return bytearray(b"\xDC\x3B\x5C")
-    elif exe.game_ver == "US04" or exe.game_ver == "US05":
-        return bytearray(b"\x9C\x2B\x5C")
-    else:
-        raise Exception("Unrecognised game version!")
 
 def get_objective_offset(location, relative_offset):
     return (location + relative_offset + 5) % 0x100000000
