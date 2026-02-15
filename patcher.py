@@ -2,7 +2,7 @@ import argparse
 import pefile
 import hashlib
 import struct
-from keystone import Ks, KS_ARCH_X86, KS_MODE_32
+from keystone import *
 from capstone import Cs, CS_ARCH_X86, CS_MODE_32
 
 class Offset:
@@ -104,8 +104,8 @@ def do_instaload_patch(exe: GameExecutable):
     payload2_asm = f"""
         pushal
         pushfd
-        cmp dword ptr [{a-0x400000:#x}], 0
-        jne continue
+        cmp dword ptr [{a-0x400000+0x40:#x}], 0
+        .byte 0x0F, 0x85, 0x05, 0x00, 0x00, 0x00
         call {frame_advance_fn_offset:#x}
     continue:
         popfd
@@ -117,8 +117,9 @@ def do_instaload_patch(exe: GameExecutable):
     c_asm = asm
     w_asm = payload
     print_asm(c_asm, cave_offset)
+    print()
     print_asm(w_asm, cave_offset)
-    exe.mem[cave_offset:cave_offset+len(payload)] = payload
+    exe.mem[cave_offset:cave_offset+len(payload)] = c_asm
 
 def print_asm(asm, addr):
     md = Cs(CS_ARCH_X86, CS_MODE_32)
