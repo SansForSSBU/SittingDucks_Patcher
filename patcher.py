@@ -30,12 +30,11 @@ class GameExecutable:
         self.memMap = pull_mem_map(path)
         self.game_ver = get_file_hash(path)
         with open(path, "rb") as f:
-            self.mem = f.read()
-            self.patched_mem = bytearray(self.mem)
+            self.mem = bytearray(f.read())
     
     def write_to(self, path):
         with open(path, "wb") as f:
-            f.write(self.patched_mem)
+            f.write(self.mem)
 
 def do_instaload_patch(exe: GameExecutable):
     cave_offsets = {
@@ -53,7 +52,7 @@ def do_instaload_patch(exe: GameExecutable):
 
     # Time to patch!
     jmp_to_hijack = make_jmp_bytes(ret_ptr, hijack_ptr)
-    exe.patched_mem[frame_advance_call_offset:frame_advance_call_offset+len(jmp_to_hijack)] = jmp_to_hijack
+    exe.mem[frame_advance_call_offset:frame_advance_call_offset+len(jmp_to_hijack)] = jmp_to_hijack
 
     payload = bytearray(
         b"\x60\x9C\x83\x3D"
@@ -71,7 +70,7 @@ def do_instaload_patch(exe: GameExecutable):
     frame_advance_fn_offset = get_objective_offset(int.from_bytes(frame_advance_fn_relative_offset, "little"), ret_ptr)
     call_bytes = make_call_bytes(hijack_ptr + 15, frame_advance_fn_offset)
     payload[15:20] = call_bytes
-    exe.patched_mem[cave_offset:cave_offset+len(payload)] = payload
+    exe.mem[cave_offset:cave_offset+len(payload)] = payload
 
 def lock_fdelta_mod(exe: GameExecutable, fdelta=0.016666668):
     fdelta_update_landmark = b"\x32\xd2\xd9" 
@@ -87,11 +86,11 @@ def lock_fdelta_mod(exe: GameExecutable, fdelta=0.016666668):
 
     # Make code which was updating fdelta to enforce the variable framerate instead put fdelta somewhere unused.
     fdelta_update_offset = get_offset_after(exe.mem, fdelta_update_landmark) + 1
-    exe.patched_mem[fdelta_update_offset:fdelta_update_offset+4] = dump_addr
+    exe.mem[fdelta_update_offset:fdelta_update_offset+4] = dump_addr
 
     # Change fdelta initialization value to the desired value
     fdelta_offset = get_offset_after(exe.mem, fdelta_landmark) + 5
-    exe.patched_mem[fdelta_offset:fdelta_offset+4] = struct.pack('<f', fdelta)
+    exe.mem[fdelta_offset:fdelta_offset+4] = struct.pack('<f', fdelta)
 
 def do_ngplus_mod(exe):
     offsets = {
@@ -102,7 +101,7 @@ def do_ngplus_mod(exe):
         "US05": 0x94D3A,
     }
     offset = offsets[exe.game_ver]
-    exe.patched_mem[offset] = 0x20
+    exe.mem[offset] = 0x20
 
 def get_offset_after(mem, string):
     offset = mem.find(string)
