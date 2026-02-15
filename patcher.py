@@ -84,11 +84,6 @@ def do_instaload_patch(exe: GameExecutable):
     jmp_to_hijack, _ = ks.asm(f"JMP {hijack_ptr}", addr=ret_ptr)
     exe.mem[frame_advance_call_offset:frame_advance_call_offset+len(jmp_to_hijack)] = jmp_to_hijack
 
-def print_asm(asm, addr):
-    md = Cs(CS_ARCH_X86, CS_MODE_32)
-    for instr in md.disasm(asm, addr):
-        print(instr)
-
 def lock_fdelta_mod(exe: GameExecutable, fdelta=0.016666668):
     fdelta_update_offset = Landmark(b"\x32\xd2\xd9", 1).to_offset(exe.mem).value
     fdelta_offset = Landmark(b"\x88\x51\x1c\xc7", 5).to_offset(exe.mem).value
