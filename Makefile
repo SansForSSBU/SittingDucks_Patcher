@@ -14,3 +14,8 @@ setup: create_venv
 .PHONY: test
 test: setup
 	. $(VENV)/bin/activate && $(PYTHON) -m pytest
+
+.PHONY: install_global
+install:
+	sudo apt install pipx
+	pipx install .

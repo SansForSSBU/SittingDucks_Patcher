@@ -1,1 +1,5 @@
-pip install -r requirements.txt
+# Installation:
+
+From root of project:
+
+make install
