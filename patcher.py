@@ -95,7 +95,6 @@ def do_instaload_patch(exe: GameExecutable):
         cmp dword ptr [{a:#x}], 0
         .byte 0x0F, 0x85, 0x05, 0x00, 0x00, 0x00
         call {frame_advance_fn_offset:#x}
-    continue:
         popfd
         popal
         jmp {ret_ptr+5:#x}
