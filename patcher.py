@@ -1,10 +1,13 @@
 import argparse
-import pefile
 import struct
-from keystone import Ks, KS_ARCH_X86, KS_MODE_32
-from capstone import Cs, CS_ARCH_X86, CS_MODE_32
+
+import pefile
+from capstone import CS_ARCH_X86, CS_MODE_32, Cs
+from keystone import KS_ARCH_X86, KS_MODE_32, Ks
+
 import data as data
 from utils import get_hash
+
 
 class Offset:
     def __init__(self, value: int):
@@ -14,9 +17,12 @@ class Offset:
 class FileOffset(Offset):
     def to_runtime_offset(self, exe):
         for idx, thing in enumerate(exe.memMap):
-            if idx == 0: continue
-            prev = exe.memMap[idx-1]
-            if (self.value < thing[1] or idx+1 == len(exe.memMap)) and (self.value > prev[1]):
+            if idx == 0:
+                continue
+            prev = exe.memMap[idx - 1]
+            if (self.value < thing[1] or idx + 1 == len(exe.memMap)) and (
+                self.value > prev[1]
+            ):
                 return RuntimeOffset(self.value - prev[1] + prev[0])
 
 
@@ -36,7 +42,9 @@ class Landmark:
         offset += len(self.landmark_bytes)
 
         if mem.find(self.landmark_bytes, offset) != -1:
-            raise Exception("There are multiple possibilities for where to patch! Aborting")
+            raise Exception(
+                "There are multiple possibilities for where to patch! Aborting"
+            )
         return Offset(offset + self.offset)
 
 
@@ -68,16 +76,24 @@ def do_instaload_patch(exe: GameExecutable):
     md.detail = True
 
     # Find the absolute offset of the frame advance function
-    frame_advance_call_offset = Landmark(b'\xff\x52\x24\xE8\xE5\xFD\xFF\xFF', -5).to_offset(exe.mem).value
-    frame_advance_call_bytes = exe.mem[frame_advance_call_offset:frame_advance_call_offset+5]
+    frame_advance_call_offset = (
+        Landmark(b"\xff\x52\x24\xe8\xe5\xfd\xff\xff", -5).to_offset(exe.mem).value
+    )
+    frame_advance_call_bytes = exe.mem[
+        frame_advance_call_offset : frame_advance_call_offset + 5
+    ]
     ret_ptr = FileOffset(frame_advance_call_offset).to_runtime_offset(exe).value
-    frame_advance_fn_offset = list(md.disasm(frame_advance_call_bytes, ret_ptr))[0].operands[0].imm
+    frame_advance_fn_offset = (
+        list(md.disasm(frame_advance_call_bytes, ret_ptr))[0].operands[0].imm
+    )
 
     # Replace the original call to the frame advance function with a jump to the payload
     cave_offset = data.cave_offsets[exe.game_ver]
     hijack_ptr = FileOffset(cave_offset).to_runtime_offset(exe).value
     jmp_to_hijack, _ = ks.asm(f"JMP {hijack_ptr}", addr=ret_ptr)
-    exe.mem[frame_advance_call_offset:frame_advance_call_offset+len(jmp_to_hijack)] = jmp_to_hijack
+    exe.mem[
+        frame_advance_call_offset : frame_advance_call_offset + len(jmp_to_hijack)
+    ] = jmp_to_hijack
 
     # Construct the payload and insert it into the code cave
     loading_ptr = data.loading_ptrs_hex[exe.game_ver]
@@ -89,27 +105,30 @@ def do_instaload_patch(exe: GameExecutable):
         call {frame_advance_fn_offset:#x}
         popfd
         popal
-        jmp {ret_ptr+5:#x}
+        jmp {ret_ptr + 5:#x}
     """
     payload, _ = ks.asm(payload_asm, addr=hijack_ptr)
-    exe.mem[cave_offset:cave_offset+len(payload)] = payload
+    exe.mem[cave_offset : cave_offset + len(payload)] = payload
 
-    
 
-def lock_fdelta_mod(exe: GameExecutable, fdelta=0.016666668):  
-    # Make code which was updating fdelta to enforce the variable framerate instead put fdelta somewhere unused.
+def lock_fdelta_mod(exe: GameExecutable, fdelta=0.016666668):
+    # The original binary updates fdelta every frame to enforce a variable framerate.
+    # We redirect it to unused memory to prevent this.
     fdelta_update_offset = Landmark(b"\x32\xd2\xd9", 1).to_offset(exe.mem).value
-    dump_addr = data.dump_addrs[exe.game_ver].to_bytes(4, 'little')
-    exe.mem[fdelta_update_offset:fdelta_update_offset+4] = dump_addr
+    dump_addr = data.dump_addrs[exe.game_ver].to_bytes(4, "little")
+    exe.mem[fdelta_update_offset : fdelta_update_offset + 4] = dump_addr
 
-    # Change fdelta initialization value to the desired value
+    # We change fdelta initialization value to the desired value
     fdelta_offset = Landmark(b"\x88\x51\x1c\xc7", 5).to_offset(exe.mem).value
-    exe.mem[fdelta_offset:fdelta_offset+4] = struct.pack('<f', fdelta)
+    exe.mem[fdelta_offset : fdelta_offset + 4] = struct.pack("<f", fdelta)
+
 
 def do_ngplus_mod(exe):
-    # Break the code which initializes the player's inventory so it instead writes values greater than 0.
+    # The original binary uses this code to set all item flags to 0 on new game.
+    # We make it write values greater than 0 instead to give the player all the items.
     offset = data.ngplus_offsets[exe.game_ver]
     exe.mem[offset] = 0x20
+
 
 def parse_CLI():
     parser = argparse.ArgumentParser(description="SittingDucks_Patcher")
@@ -120,15 +139,20 @@ def parse_CLI():
     parser.add_argument("--newgameplus", action="store_true", help="New game plus")
     return parser.parse_args()
 
+
 def main():
     args = parse_CLI()
     exe = GameExecutable(args.in_path)
 
-    if args.instaload: do_instaload_patch(exe)
-    if args.speedfix: lock_fdelta_mod(exe)
-    if args.newgameplus: do_ngplus_mod(exe)
+    if args.instaload:
+        do_instaload_patch(exe)
+    if args.speedfix:
+        lock_fdelta_mod(exe)
+    if args.newgameplus:
+        do_ngplus_mod(exe)
 
     exe.write_to(args.out_path)
+
 
 if __name__ == "__main__":
     main()
