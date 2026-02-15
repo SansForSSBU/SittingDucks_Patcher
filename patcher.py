@@ -246,9 +246,12 @@ memMaps = {
     ],
 }
 
-def get_file_hash(file_path):
+def get_hash(file_path):
     with open(file_path, "rb") as f:
-        return game_vers[hashlib.file_digest(f, "md5").digest()]
+        return hashlib.file_digest(f, "md5").digest()
+
+def get_file_hash(file_path):
+    return game_vers[get_hash(file_path)]
 
 game_ver = None
 mem = None
