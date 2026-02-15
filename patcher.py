@@ -62,23 +62,17 @@ class GameExecutable:
 
 
 def do_instaload_patch(exe: GameExecutable):
-    # Set up keystone and capstone to handle assembly and disassembly
-    ks = Ks(KS_ARCH_X86, KS_MODE_32)
-    md = Cs(CS_ARCH_X86, CS_MODE_32)
-    md.detail = True
-    
-    # Find absolute offset of the frame advance function
+    cave_offset = data.cave_offsets[exe.game_ver]
     frame_advance_call_offset = Landmark(b'\xff\x52\x24\xE8\xE5\xFD\xFF\xFF', -5).to_offset(exe.mem).value
     frame_advance_call = exe.mem[frame_advance_call_offset:frame_advance_call_offset+5]
-    frame_advance_fn_offset = list(md.disasm(frame_advance_call, ret_ptr))[0].operands[0].imm
-
-    # Insert the hijack to jump to the code cave where the original call to the frame advance function was
     hijack_ptr = FileOffset(cave_offset).to_runtime_offset(exe).value
     ret_ptr = FileOffset(frame_advance_call_offset).to_runtime_offset(exe).value
-    jmp_to_hijack, _ = ks.asm(f"JMP {hijack_ptr}", addr=ret_ptr)
-    exe.mem[frame_advance_call_offset:frame_advance_call_offset+len(jmp_to_hijack)] = jmp_to_hijack
+    ks = Ks(KS_ARCH_X86, KS_MODE_32)
+    md = Cs(CS_ARCH_X86, CS_MODE_32)
 
-    # Construct the payload and insert it into the code cave
+    md.detail = True
+    frame_advance_fn_offset = list(md.disasm(frame_advance_call, ret_ptr))[0].operands[0].imm
+
     loading_ptr = data.loading_ptrs_hex[exe.game_ver]
     payload_asm = f"""
         pushal
@@ -91,8 +85,10 @@ def do_instaload_patch(exe: GameExecutable):
         jmp {ret_ptr+5:#x}
     """
     payload, _ = ks.asm(payload_asm, addr=hijack_ptr)
-    cave_offset = data.cave_offsets[exe.game_ver]
     exe.mem[cave_offset:cave_offset+len(payload)] = payload
+
+    jmp_to_hijack, _ = ks.asm(f"JMP {hijack_ptr}", addr=ret_ptr)
+    exe.mem[frame_advance_call_offset:frame_advance_call_offset+len(jmp_to_hijack)] = jmp_to_hijack
 
 def lock_fdelta_mod(exe: GameExecutable, fdelta=0.016666668):  
     # Make code which was updating fdelta to enforce the variable framerate instead put fdelta somewhere unused.
