@@ -100,11 +100,18 @@ def do_instaload_patch(exe: GameExecutable):
         b"\x9D\x61" +
         bytes(jmp_back)
         )
-    a = int.from_bytes(loading_ptrs[exe.game_ver])
+    loading_ptrs_hex = {
+        "EU": 0x5c2b9c,
+        "PO": 0x5c3bdc,
+        "RU": 0x5c3bdc,
+        "US04": 0x5c2b9c,
+        "US05": 0x5c2b9c
+    }
+    a = loading_ptrs_hex[exe.game_ver]
     payload2_asm = f"""
         pushal
         pushfd
-        cmp dword ptr [{a-0x400000+0x40:#x}], 0
+        cmp dword ptr [{a:#x}], 0
         .byte 0x0F, 0x85, 0x05, 0x00, 0x00, 0x00
         call {frame_advance_fn_offset:#x}
     continue:
