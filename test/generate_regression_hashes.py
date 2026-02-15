@@ -10,9 +10,9 @@ def get_hash(file_path):
     with open(file_path, "rb") as f:
         return hashlib.file_digest(f, "md5").digest()
 
-def run_patcher(ver, instaload=False, speedfix=False, newgameplus=False):
+def run_patcher(game_ver, instaload=False, speedfix=False, newgameplus=False):
     overlay = "overlay.exe" if game_ver in ["EU", "US04", "US05"] else "OVERLAY.exe"
-    args = ["python3", "patcher.py", f"test/game_exes/{ver}/{overlay}", "test/tmp/overlay.exe"]
+    args = ["python3", "patcher.py", f"test/game_exes/{game_ver}/{overlay}", "test/tmp/overlay.exe"]
     if instaload: args.append("--instaload")
     if speedfix: args.append("--speedfix")
     if newgameplus: args.append("--newgameplus")
