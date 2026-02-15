@@ -3,6 +3,7 @@ import pefile
 import hashlib
 import struct
 from keystone import Ks, KS_ARCH_X86, KS_MODE_32
+from capstone import Cs, CS_ARCH_X86, CS_MODE_32
 
 class Offset:
     def __init__(self, value: int):
@@ -83,6 +84,7 @@ def do_instaload_patch(exe: GameExecutable):
 
     # Time to patch!
     ks = Ks(KS_ARCH_X86, KS_MODE_32)
+    md = Cs(CS_ARCH_X86, CS_MODE_32)
     jmp_to_hijack, _ = ks.asm(f"JMP {hijack_ptr}", addr=ret_ptr)
     exe.mem[frame_advance_call_offset:frame_advance_call_offset+len(jmp_to_hijack)] = jmp_to_hijack
 
@@ -97,9 +99,9 @@ def do_instaload_patch(exe: GameExecutable):
     payload[4:7] = loading_ptrs[exe.game_ver]
     jmp_back, _ = ks.asm(f"JMP {ret_ptr+5}", addr=hijack_ptr+22)
     payload[22:27] = jmp_back
-    # We need to figure out offset for CALL too.
-    frame_advance_fn_relative_offset = frame_advance_call[1:]
-    frame_advance_fn_offset = get_objective_offset(int.from_bytes(frame_advance_fn_relative_offset, "little"), ret_ptr)
+    md.detail = True
+    disasm = md.disasm(frame_advance_call, ret_ptr)
+    frame_advance_fn_offset = list(md.disasm(frame_advance_call, ret_ptr))[0].operands[0].imm
     call_bytes, _ = ks.asm(f"CALL {frame_advance_fn_offset}", addr=hijack_ptr+15)
     payload[15:20] = call_bytes
     exe.mem[cave_offset:cave_offset+len(payload)] = payload
@@ -132,9 +134,6 @@ def do_ngplus_mod(exe):
     }
     offset = offsets[exe.game_ver]
     exe.mem[offset] = 0x20
-
-def get_objective_offset(location, relative_offset):
-    return (location + relative_offset + 5) % 0x100000000
 
 # TODO: Move into utility file
 def get_hash(file_path):

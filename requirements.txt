@@ -1,3 +1,4 @@
 pytest
 pefile
 keystone-engine
+capstone
