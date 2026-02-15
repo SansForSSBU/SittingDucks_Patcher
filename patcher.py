@@ -272,8 +272,6 @@ def main():
     memMap = memMaps[game_ver]
     patched_mem = bytearray(mem)
 
-    print(args.instaload, args.speedfix, args.newgameplus)
-    
     if args.instaload: do_instaload_patch()
     if args.speedfix: do_speed_issue_fix()
     if args.newgameplus: do_ngplus_mod()
