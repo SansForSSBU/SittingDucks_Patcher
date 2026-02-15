@@ -3,14 +3,13 @@ import json
 import subprocess
 from itertools import product
 
-from utils import get_hash
+from duckpatch.utils import get_hash
 
 
 def run_patcher(game_ver, instaload=False, speedfix=False, newgameplus=False):
     overlay = "overlay.exe" if game_ver in ["EU", "US04", "US05"] else "OVERLAY.exe"
     args = [
-        "python3",
-        "patcher.py",
+        "duckpatch",
         f"test/game_exes/{game_ver}/{overlay}",
         "test/tmp/overlay.exe",
     ]

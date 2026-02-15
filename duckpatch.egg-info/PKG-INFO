@@ -1,0 +1,8 @@
+Metadata-Version: 2.4
+Name: duckpatch
+Version: 1.0.0
+Summary: Sitting-Ducks-mod-tool
+Requires-Python: >=3.11
+Description-Content-Type: text/markdown
+
+pip install -r requirements.txt
