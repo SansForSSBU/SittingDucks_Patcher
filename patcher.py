@@ -26,12 +26,21 @@ class Landmark:
         return Offset(get_offset_after(mem, self.landmark_bytes) + self.offset)
 
 class GameExecutable:
+    def _get_mem_map(self, file_path):
+        pe = pefile.PE(file_path)
+        mem_map = [(0x00400000, 0x0)]
+        for section in pe.sections:
+            file_offset = section.PointerToRawData
+            memory_offset = pe.OPTIONAL_HEADER.ImageBase + section.VirtualAddress
+            mem_map.append((memory_offset, file_offset))
+        return mem_map
+
     def __init__(self, path):
-        self.memMap = pull_mem_map(path)
+        self.memMap = self._get_mem_map(path)
         self.game_ver = get_file_hash(path)
         with open(path, "rb") as f:
             self.mem = bytearray(f.read())
-    
+
     def write_to(self, path):
         with open(path, "wb") as f:
             f.write(self.mem)
@@ -150,18 +159,6 @@ def translate_to_runtime_offset(file_offset, exe):
         prev = exe.memMap[idx-1]
         if (file_offset < thing[1] or idx+1 == len(exe.memMap)) and (file_offset > prev[1]):
             return file_offset - prev[1] + prev[0]
-
-def format_bytes(b):
-    return ' '.join(r''+hex(letter)[2:] for letter in b)
-
-def pull_mem_map(file_path):
-    pe = pefile.PE(file_path)
-    mem_map = [(0x00400000, 0x0)]
-    for section in pe.sections:
-        file_offset = section.PointerToRawData
-        memory_offset = pe.OPTIONAL_HEADER.ImageBase + section.VirtualAddress
-        mem_map.append((memory_offset, file_offset))
-    return mem_map
 
 game_vers = {
     b'\x83t\x1e\x0c\x07\xc4\x19\xaf\x14j\xc9Y\xc1\xe6\x81\\': "EU",
