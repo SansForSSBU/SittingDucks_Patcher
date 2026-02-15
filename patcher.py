@@ -69,16 +69,6 @@ def do_instaload_patch(exe: GameExecutable):
         "US04": 0x191970,
         "US05": 0x191970,
     }
-    cave_offset = cave_offsets[exe.game_ver]
-    frame_advance_call_offset = Landmark(b'\xff\x52\x24\xE8\xE5\xFD\xFF\xFF', -5).to_offset(exe.mem).value
-    frame_advance_call = exe.mem[frame_advance_call_offset:frame_advance_call_offset+5]
-    hijack_ptr = FileOffset(cave_offset).to_runtime_offset(exe).value
-    ret_ptr = FileOffset(frame_advance_call_offset).to_runtime_offset(exe).value
-    ks = Ks(KS_ARCH_X86, KS_MODE_32)
-    md = Cs(CS_ARCH_X86, CS_MODE_32)
-    
-    md.detail = True
-    frame_advance_fn_offset = list(md.disasm(frame_advance_call, ret_ptr))[0].operands[0].imm
     loading_ptrs_hex = {
         "EU": 0x5c2b9c,
         "PO": 0x5c3bdc,
@@ -86,6 +76,17 @@ def do_instaload_patch(exe: GameExecutable):
         "US04": 0x5c2b9c,
         "US05": 0x5c2b9c
     }
+
+    cave_offset = cave_offsets[exe.game_ver]
+    frame_advance_call_offset = Landmark(b'\xff\x52\x24\xE8\xE5\xFD\xFF\xFF', -5).to_offset(exe.mem).value
+    frame_advance_call = exe.mem[frame_advance_call_offset:frame_advance_call_offset+5]
+    hijack_ptr = FileOffset(cave_offset).to_runtime_offset(exe).value
+    ret_ptr = FileOffset(frame_advance_call_offset).to_runtime_offset(exe).value
+    ks = Ks(KS_ARCH_X86, KS_MODE_32)
+    md = Cs(CS_ARCH_X86, CS_MODE_32)
+
+    md.detail = True
+    frame_advance_fn_offset = list(md.disasm(frame_advance_call, ret_ptr))[0].operands[0].imm
 
     a = loading_ptrs_hex[exe.game_ver]
     payload_asm = f"""
