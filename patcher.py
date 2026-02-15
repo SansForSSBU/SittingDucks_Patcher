@@ -95,13 +95,11 @@ def do_instaload_patch(exe: GameExecutable):
     payload = bytearray(
         b"\x60\x9C\x83\x3D" +
         bytes(loading_ptrs[exe.game_ver]) +
-        b"\x00\x00\x0F\x85\x05\x00\x00\x00"
-        b"\xE8\x00\x00\x00\x00" # CALL to original routine. Index 15-19.
-        b"\x9D\x61"
-        b"\xE9\x00\x00\x00\x00" # JMP back to where we hijacked from. Index 22-26.
+        b"\x00\x00\x0F\x85\x05\x00\x00\x00" +
+        bytes(call_bytes) +
+        b"\x9D\x61" +
+        bytes(jmp_back)
         )
-    payload[22:27] = jmp_back
-    payload[15:20] = call_bytes
     exe.mem[cave_offset:cave_offset+len(payload)] = payload
 
 def lock_fdelta_mod(exe: GameExecutable, fdelta=0.016666668):
