@@ -11,6 +11,8 @@ If it's running slower despite you setting the frame limiter in DxWnd, try enabl
 NOTE: Speedruns must use instant_loading and speed_issue_fix
 """
 
+import argparse
+
 game_folder = "C:/Users/Joseph/Desktop/Ducks/Sitting Ducks EU"
 # MODS
 instant_loading = True
@@ -184,9 +186,6 @@ def translate_to_runtime_offset(file_offset):
 def format_bytes(b):
     return ' '.join(r''+hex(letter)[2:] for letter in b)
 
-def get_file_hash(path):
-    with open(path, "rb") as f:
-        return game_vers[hashlib.file_digest(f, "md5").digest()]
 import hashlib
 JMP_OPCODE = 0xE9
 CALL_OPCODE = 0xE8
@@ -246,39 +245,41 @@ memMaps = {
         (0x005dc000, 0x1c9000)
     ],
 }
-backup_exe_name = "backup_overlay.exe"
-try:
-    with open(f"{game_folder}/overlay.exe"):
-        output_exe_name = "overlay.exe"
-except FileNotFoundError:
-    output_exe_name = "OVERLAY.exe"
 
-try:
-    with open(f"{game_folder}/{backup_exe_name}", "rb") as f:
-        mem = f.read()
-        
-except FileNotFoundError:
-    # This must be the first time we're running, so let's create the backup.
-    try:
-        with open(f"{game_folder}/{output_exe_name}", "rb") as f:
-            mem = f.read()
-    except FileNotFoundError:
-        print(f"Invalid game folder: {game_folder}")
-        raise Exception("Bad game folder")
-    with open(f"{game_folder}/{backup_exe_name}", "wb") as f:
-        f.write(mem)
+def get_file_hash(file_path):
+    with open(file_path, "rb") as f:
+        return game_vers[hashlib.file_digest(f, "md5").digest()]
 
-game_ver = get_file_hash(f"{game_folder}/{backup_exe_name}")
-memMap = memMaps[game_ver]
-patched_mem = bytearray(mem)
+game_ver = None
+mem = None
+memMap = None
+patched_mem = None
+def main():
+    global game_ver
+    global mem
+    global memMap
+    global patched_mem
+    parser = argparse.ArgumentParser(description="SittingDucks_Patcher")
+    parser.add_argument("in_path", type=str, help="In path")
+    parser.add_argument("out_path", type=str, help="Out path")
+    parser.add_argument("--instaload", action="store_true", help="Instaload")
+    parser.add_argument("--speedfix", action="store_true", help="Speed fix")
+    parser.add_argument("--newgameplus", action="store_true", help="New game plus")
+    args = parser.parse_args()
+    f = open(args.in_path, "rb")
+    mem = f.read()
+    game_ver = get_file_hash(args.in_path)
+    memMap = memMaps[game_ver]
+    patched_mem = bytearray(mem)
 
-if instant_loading: do_instaload_patch()
-if speed_issue_fix: do_speed_issue_fix()
-if new_game_plus: do_ngplus_mod()
+    print(args.instaload, args.speedfix, args.newgameplus)
+    
+    if args.instaload: do_instaload_patch()
+    if args.speedfix: do_speed_issue_fix()
+    if args.newgameplus: do_ngplus_mod()
 
-with open(f"{game_folder}/{output_exe_name}", "wb") as f:
-    f.write(patched_mem)
-print(f"""Successfully patched game at {game_folder} with mods:
-Fast loading: {instant_loading}
-Speed issue fix: {speed_issue_fix}
-New game plus: {new_game_plus}""")
+    with open(args.out_path, "wb") as f:
+        f.write(patched_mem)
+
+if __name__ == "__main__":
+    main()
