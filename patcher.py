@@ -100,7 +100,30 @@ def do_instaload_patch(exe: GameExecutable):
         b"\x9D\x61" +
         bytes(jmp_back)
         )
+    a = int.from_bytes(loading_ptrs[exe.game_ver])
+    payload2_asm = f"""
+        pushal
+        pushfd
+        cmp dword ptr [{a-0x400000:#x}], 0
+        jne continue
+        call {frame_advance_fn_offset:#x}
+    continue:
+        popfd
+        popal
+        jmp {ret_ptr+5:#x}
+    """
+    asm, _ = ks.asm(payload2_asm, addr=hijack_ptr)
+    asm = bytearray(asm)
+    c_asm = asm
+    w_asm = payload
+    print_asm(c_asm, cave_offset)
+    print_asm(w_asm, cave_offset)
     exe.mem[cave_offset:cave_offset+len(payload)] = payload
+
+def print_asm(asm, addr):
+    md = Cs(CS_ARCH_X86, CS_MODE_32)
+    for instr in md.disasm(asm, addr):
+        print(instr)
 
 def lock_fdelta_mod(exe: GameExecutable, fdelta=0.016666668):
     fdelta_update_offset = Landmark(b"\x32\xd2\xd9", 1).to_offset(exe.mem).value
