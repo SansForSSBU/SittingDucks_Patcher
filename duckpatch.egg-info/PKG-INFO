@@ -1,0 +1,13 @@
+Metadata-Version: 2.4
+Name: duckpatch
+Version: 1.0.0
+Summary: Sitting-Ducks-mod-tool
+Requires-Python: >=3.11
+Description-Content-Type: text/markdown
+Requires-Dist: pytest
+Requires-Dist: pefile
+Requires-Dist: keystone-engine
+Requires-Dist: capstone
+Requires-Dist: ruff
+
+pip install -r requirements.txt

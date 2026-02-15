@@ -5,8 +5,8 @@ import pefile
 from capstone import CS_ARCH_X86, CS_MODE_32, Cs
 from keystone import KS_ARCH_X86, KS_MODE_32, Ks
 
-import data as data
-from utils import get_hash
+import duckpatch.data as data
+from duckpatch.utils import get_hash
 
 
 class Offset:

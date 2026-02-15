@@ -1,3 +1,24 @@
+[project]
+name = "duckpatch"
+version = "1.0.0"
+description = "Sitting-Ducks-mod-tool"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "pytest",
+    "pefile",
+    "keystone-engine",
+    "capstone",
+    "ruff",
+]
+
+[project.scripts]
+duckpatch = "duckpatch.patcher:main"
+
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
 [tool.ruff]
 line-length = 88
 target-version = "py311"

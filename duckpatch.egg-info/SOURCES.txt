@@ -1,0 +1,12 @@
+README.md
+pyproject.toml
+duckpatch/data.py
+duckpatch/patcher.py
+duckpatch/utils.py
+duckpatch.egg-info/PKG-INFO
+duckpatch.egg-info/SOURCES.txt
+duckpatch.egg-info/dependency_links.txt
+duckpatch.egg-info/entry_points.txt
+duckpatch.egg-info/requires.txt
+duckpatch.egg-info/top_level.txt
+test/test_patcher.py
