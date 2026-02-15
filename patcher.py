@@ -23,7 +23,14 @@ class Landmark:
         self.offset = offset
 
     def to_offset(self, mem):
-        return Offset(get_offset_after(mem, self.landmark_bytes) + self.offset)
+        offset = mem.find(self.landmark_bytes)
+        if offset == -1:
+            raise Exception("Could not find memory we expected to find")
+        offset += len(self.landmark_bytes)
+
+        if mem.find(self.landmark_bytes, offset) != -1:
+            raise Exception("There are multiple possibilities for where to patch! Aborting")
+        return Offset(offset)
 
 class GameExecutable:
     game_vers = {
@@ -123,16 +130,6 @@ def do_ngplus_mod(exe):
     }
     offset = offsets[exe.game_ver]
     exe.mem[offset] = 0x20
-
-def get_offset_after(mem, string):
-    offset = mem.find(string)
-    if offset == -1:
-        raise Exception("Could not find memory we expected to find")
-    offset += len(string)
-
-    if mem.find(string, offset) != -1:
-        raise Exception("There are multiple possibilities for where to patch! Aborting")
-    return offset
 
 def get_relative_offset(start, dest):
     offset = dest - start - JMP_INSTRUCTION_LEN
