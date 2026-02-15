@@ -92,14 +92,6 @@ def do_instaload_patch(exe: GameExecutable):
     frame_advance_fn_offset = list(md.disasm(frame_advance_call, ret_ptr))[0].operands[0].imm
     jmp_back, _ = ks.asm(f"JMP {ret_ptr+5}", addr=hijack_ptr+22)
     call_bytes, _ = ks.asm(f"CALL {frame_advance_fn_offset}", addr=hijack_ptr+15)
-    payload = bytearray(
-        b"\x60\x9C\x83\x3D" +
-        bytes(loading_ptrs[exe.game_ver]) +
-        b"\x00\x00\x0F\x85\x05\x00\x00\x00" +
-        bytes(call_bytes) +
-        b"\x9D\x61" +
-        bytes(jmp_back)
-        )
     loading_ptrs_hex = {
         "EU": 0x5c2b9c,
         "PO": 0x5c3bdc,
@@ -120,13 +112,7 @@ def do_instaload_patch(exe: GameExecutable):
         jmp {ret_ptr+5:#x}
     """
     asm, _ = ks.asm(payload2_asm, addr=hijack_ptr)
-    asm = bytearray(asm)
-    c_asm = asm
-    w_asm = payload
-    print_asm(c_asm, cave_offset)
-    print()
-    print_asm(w_asm, cave_offset)
-    exe.mem[cave_offset:cave_offset+len(payload)] = c_asm
+    exe.mem[cave_offset:cave_offset+len(asm)] = asm
 
 def print_asm(asm, addr):
     md = Cs(CS_ARCH_X86, CS_MODE_32)
