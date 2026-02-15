@@ -10,8 +10,23 @@
             "type": "debugpy",
             "request": "launch",
             "program": "${workspaceFolder}/patcher.py",
-            "args": ["test/game_exes/EU/overlay.exe", "test/tmp/overlay.exe", "--instaload", "--speedfix", "--newgameplus"],
+            "args": ["test/game_exes/${input:gameVersion}", "test/tmp/overlay.exe", "--instaload", "--speedfix", "--newgameplus"],
             "console": "integratedTerminal"
+        }
+    ],
+    "inputs": [
+        {
+            "id": "gameVersion",
+            "type": "pickString",
+            "description": "Select run mode",
+            "options": [
+                "EU/overlay.exe",
+                "PO/OVERLAY.exe",
+                "RU/OVERLAY.exe",
+                "US04/overlay.exe",
+                "US05/overlay.exe"
+            ],
+            "default": "EU"
         }
     ]
 }

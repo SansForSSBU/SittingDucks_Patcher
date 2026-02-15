@@ -9,17 +9,15 @@ JMP_INSTRUCTION_LEN = 5
 
 def do_instaload_patch():
     global patched_mem
-    cave_mems = {
-        "EU": b'\xff\xff\x5b\x81\xc4\x90\x00\x00\x00\xC3',
-        "PO": b'\xb8\xac\xb4\x5a\x00\xe9\x6b\x2d\xff\xff',
-        "RU": b'\xb8\xac\xb4\x5a\x00\xe9\x6b\x2d\xff\xff',
-        "US04": b'\xff\x25\xa8\x21\x59\x00\xb8\xcc\xa3\x5a\x00\xe9\x8b\x2d\xff\xff',
-        "US05": b'\xff\x25\xa8\x21\x59\x00\xb8\xcc\xa3\x5a\x00\xe9\x8b\x2d\xff\xff',
-    }
     prev_fn_call_landmark = b'\xff\x52\x24\xE8\xE5\xFD\xFF\xFF'
-    cave_mem = cave_mems[game_ver]
-    
-    cave_offset = get_offset_after(mem, cave_mem)
+    cave_offsets = {
+        "EU": 0x1dcd1c,
+        "PO": 0x1924a0,
+        "RU": 0x1924a0,
+        "US04": 0x191970,
+        "US05": 0x191970,
+    }
+    cave_offset = cave_offsets[game_ver]
     frame_advance_call_offset = get_offset_after(mem, prev_fn_call_landmark) - 5
     frame_advance_call = mem[frame_advance_call_offset:frame_advance_call_offset+5]
     hijack_ptr = translate_to_runtime_offset(cave_offset)
