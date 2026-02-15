@@ -25,8 +25,15 @@ class Landmark:
     def to_offset(self, mem):
         return Offset(get_offset_after(mem, self.landmark_bytes) + self.offset)
 
-def do_instaload_patch():
-    global patched_mem
+class GameExecutable:
+    def __init__(self, path):
+        self.memMap = pull_mem_map(path)
+        self.game_ver = get_file_hash(path)
+        with open(path, "rb") as f:
+            self.mem = f.read()
+            self.patched_mem = bytearray(self.mem)
+
+def do_instaload_patch(exe: GameExecutable):
     cave_offsets = {
         "EU": 0x1dcd1c,
         "PO": 0x1924a0,
@@ -34,15 +41,15 @@ def do_instaload_patch():
         "US04": 0x191970,
         "US05": 0x191970,
     }
-    frame_advance_call_offset = Landmark(b'\xff\x52\x24\xE8\xE5\xFD\xFF\xFF', -5).to_offset(mem).value
-    cave_offset = cave_offsets[game_ver]
-    frame_advance_call = mem[frame_advance_call_offset:frame_advance_call_offset+5]
-    hijack_ptr = translate_to_runtime_offset(cave_offset)
-    ret_ptr = translate_to_runtime_offset(frame_advance_call_offset)
+    frame_advance_call_offset = Landmark(b'\xff\x52\x24\xE8\xE5\xFD\xFF\xFF', -5).to_offset(exe.mem).value
+    cave_offset = cave_offsets[exe.game_ver]
+    frame_advance_call = exe.mem[frame_advance_call_offset:frame_advance_call_offset+5]
+    hijack_ptr = translate_to_runtime_offset(cave_offset, exe)
+    ret_ptr = translate_to_runtime_offset(frame_advance_call_offset, exe)
 
     # Time to patch!
     jmp_to_hijack = make_jmp_bytes(ret_ptr, hijack_ptr)
-    patched_mem[frame_advance_call_offset:frame_advance_call_offset+len(jmp_to_hijack)] = jmp_to_hijack
+    exe.patched_mem[frame_advance_call_offset:frame_advance_call_offset+len(jmp_to_hijack)] = jmp_to_hijack
 
     payload = bytearray(
         b"\x60\x9C\x83\x3D"
@@ -52,7 +59,7 @@ def do_instaload_patch():
         b"\x9D\x61"
         b"\xE9\x00\x00\x00\x00" # JMP back to where we hijacked from. Index 22-26.
         )
-    payload[4:7] = get_loading_ptr()
+    payload[4:7] = get_loading_ptr(exe)
     jmp_back = make_jmp_bytes(hijack_ptr+22, ret_ptr+5)
     payload[22:27] = jmp_back
     # We need to figure out offset for CALL too.
@@ -60,10 +67,9 @@ def do_instaload_patch():
     frame_advance_fn_offset = get_objective_offset(int.from_bytes(frame_advance_fn_relative_offset, "little"), ret_ptr)
     call_bytes = make_call_bytes(hijack_ptr + 15, frame_advance_fn_offset)
     payload[15:20] = call_bytes
-    patched_mem[cave_offset:cave_offset+len(payload)] = payload
+    exe.patched_mem[cave_offset:cave_offset+len(payload)] = payload
 
-def lock_fdelta_mod(fdelta=0.016666668):
-    global patched_mem
+def lock_fdelta_mod(exe: GameExecutable, fdelta=0.016666668):
     fdelta_update_landmark = b"\x32\xd2\xd9" 
     fdelta_landmark = b"\x88\x51\x1c\xc7" 
     dump_addrs = {
@@ -73,18 +79,17 @@ def lock_fdelta_mod(fdelta=0.016666668):
         "RU": 0x005c6f00,
         "PO": 0x005c6f00,
     }
-    dump_addr = dump_addrs[game_ver].to_bytes(4, 'little')
+    dump_addr = dump_addrs[exe.game_ver].to_bytes(4, 'little')
 
     # Make code which was updating fdelta to enforce the variable framerate instead put fdelta somewhere unused.
-    fdelta_update_offset = get_offset_after(mem, fdelta_update_landmark) + 1
-    patched_mem[fdelta_update_offset:fdelta_update_offset+4] = dump_addr
+    fdelta_update_offset = get_offset_after(exe.mem, fdelta_update_landmark) + 1
+    exe.patched_mem[fdelta_update_offset:fdelta_update_offset+4] = dump_addr
 
     # Change fdelta initialization value to the desired value
-    fdelta_offset = get_offset_after(mem, fdelta_landmark) + 5
-    patched_mem[fdelta_offset:fdelta_offset+4] = struct.pack('<f', fdelta)
+    fdelta_offset = get_offset_after(exe.mem, fdelta_landmark) + 5
+    exe.patched_mem[fdelta_offset:fdelta_offset+4] = struct.pack('<f', fdelta)
 
-def do_ngplus_mod():
-    global patched_mem
+def do_ngplus_mod(exe):
     offsets = {
         "EU": 0x93C3E,
         "RU": 0x947DE,
@@ -92,8 +97,8 @@ def do_ngplus_mod():
         "US04": 0x94D3A,
         "US05": 0x94D3A,
     }
-    offset = offsets[game_ver]
-    patched_mem[offset] = 0x20
+    offset = offsets[exe.game_ver]
+    exe.patched_mem[offset] = 0x20
 
 def get_offset_after(mem, string):
     offset = mem.find(string)
@@ -126,13 +131,13 @@ def make_call_bytes(start, dest):
     instr.extend(bytearray(call_args))
     return instr
 
-def get_loading_ptr():
-    global game_ver
-    if game_ver == "EU":
+def get_loading_ptr(exe):
+
+    if exe.game_ver == "EU":
         return bytearray(b"\x9C\x2B\x5C")
-    elif game_ver == "PO" or game_ver == 'RU':
+    elif exe.game_ver == "PO" or exe.game_ver == 'RU':
         return bytearray(b"\xDC\x3B\x5C")
-    elif game_ver == "US04" or game_ver == "US05":
+    elif exe.game_ver == "US04" or exe.game_ver == "US05":
         return bytearray(b"\x9C\x2B\x5C")
     else:
         raise Exception("Unrecognised game version!")
@@ -140,11 +145,11 @@ def get_loading_ptr():
 def get_objective_offset(location, relative_offset):
     return (location + relative_offset + 5) % 0x100000000
 
-def translate_to_runtime_offset(file_offset):
-    for idx, thing in enumerate(memMap):
+def translate_to_runtime_offset(file_offset, exe):
+    for idx, thing in enumerate(exe.memMap):
         if idx == 0: continue
-        prev = memMap[idx-1]
-        if (file_offset < thing[1] or idx+1 == len(memMap)) and (file_offset > prev[1]):
+        prev = exe.memMap[idx-1]
+        if (file_offset < thing[1] or idx+1 == len(exe.memMap)) and (file_offset > prev[1]):
             return file_offset - prev[1] + prev[0]
 
 def format_bytes(b):
@@ -174,34 +179,25 @@ def get_hash(file_path):
 def get_file_hash(file_path):
     return game_vers[get_hash(file_path)]
 
-game_ver = None
-mem = None
-memMap = None
-patched_mem = None
-def main():
-    global game_ver
-    global mem
-    global memMap
-    global patched_mem
+def parse_CLI():
     parser = argparse.ArgumentParser(description="SittingDucks_Patcher")
     parser.add_argument("in_path", type=str, help="In path")
     parser.add_argument("out_path", type=str, help="Out path")
     parser.add_argument("--instaload", action="store_true", help="Instaload")
     parser.add_argument("--speedfix", action="store_true", help="Speed fix")
     parser.add_argument("--newgameplus", action="store_true", help="New game plus")
-    args = parser.parse_args()
-    memMap = pull_mem_map(args.in_path)
-    f = open(args.in_path, "rb")
-    mem = f.read()
-    game_ver = get_file_hash(args.in_path)
-    patched_mem = bytearray(mem)
+    return parser.parse_args()
 
-    if args.instaload: do_instaload_patch()
-    if args.speedfix: lock_fdelta_mod()
-    if args.newgameplus: do_ngplus_mod()
+def main():
+    args = parse_CLI()
+    exe = GameExecutable(args.in_path)
+
+    if args.instaload: do_instaload_patch(exe)
+    if args.speedfix: lock_fdelta_mod(exe)
+    if args.newgameplus: do_ngplus_mod(exe)
 
     with open(args.out_path, "wb") as f:
-        f.write(patched_mem)
+        f.write(exe.patched_mem)
 
 if __name__ == "__main__":
     main()
