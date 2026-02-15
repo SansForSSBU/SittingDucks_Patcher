@@ -4,7 +4,13 @@ version = "1.0.0"
 description = "Sitting-Ducks-mod-tool"
 readme = "README.md"
 requires-python = ">=3.11"
-dependencies = []
+dependencies = [
+    "pytest",
+    "pefile",
+    "keystone-engine",
+    "capstone",
+    "ruff",
+]
 
 [project.scripts]
 duckpatch = "duckpatch.patcher:main"
