@@ -1,6 +1,8 @@
-import subprocess
 import json
+import subprocess
+
 import generate_regression_hashes
+
 
 def run_patcher(ver, instaload=False, speedfix=False, newgameplus=False):
     args = ["python3", "patcher.py", f"test/game_exes/{ver}/overlay.exe", "test/tmp/overlay.exe"]

@@ -1,10 +1,13 @@
 import argparse
-import pefile
 import struct
-from keystone import Ks, KS_ARCH_X86, KS_MODE_32
-from capstone import Cs, CS_ARCH_X86, CS_MODE_32
+
+import pefile
+from capstone import CS_ARCH_X86, CS_MODE_32, Cs
+from keystone import KS_ARCH_X86, KS_MODE_32, Ks
+
 import data as data
 from utils import get_hash
+
 
 class Offset:
     def __init__(self, value: int):
@@ -124,9 +127,12 @@ def main():
     args = parse_CLI()
     exe = GameExecutable(args.in_path)
 
-    if args.instaload: do_instaload_patch(exe)
-    if args.speedfix: lock_fdelta_mod(exe)
-    if args.newgameplus: do_ngplus_mod(exe)
+    if args.instaload: 
+        do_instaload_patch(exe)
+    if args.speedfix: 
+        lock_fdelta_mod(exe)
+    if args.newgameplus: 
+        do_ngplus_mod(exe)
 
     exe.write_to(args.out_path)
 

@@ -1,8 +1,10 @@
-import subprocess
-import json
 import base64
+import json
+import subprocess
 from itertools import product
+
 from utils import get_hash
+
 
 def run_patcher(game_ver, instaload=False, speedfix=False, newgameplus=False):
     overlay = "overlay.exe" if game_ver in ["EU", "US04", "US05"] else "OVERLAY.exe"
