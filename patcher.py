@@ -1,10 +1,10 @@
 import argparse
 import pefile
-import hashlib
 import struct
 from keystone import Ks, KS_ARCH_X86, KS_MODE_32
 from capstone import Cs, CS_ARCH_X86, CS_MODE_32
 import data as data
+from utils import get_hash
 
 class Offset:
     def __init__(self, value: int):
@@ -103,11 +103,6 @@ def lock_fdelta_mod(exe: GameExecutable, fdelta=0.016666668):
 def do_ngplus_mod(exe):
     offset = data.ngplus_offsets[exe.game_ver]
     exe.mem[offset] = 0x20
-
-# TODO: Move into utility file
-def get_hash(file_path):
-    with open(file_path, "rb") as f:
-        return hashlib.file_digest(f, "md5").digest()
 
 def parse_CLI():
     parser = argparse.ArgumentParser(description="SittingDucks_Patcher")
