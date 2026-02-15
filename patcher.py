@@ -96,8 +96,8 @@ def do_instaload_patch(exe: GameExecutable):
     exe.mem[cave_offset:cave_offset+len(payload)] = payload
 
 def lock_fdelta_mod(exe: GameExecutable, fdelta=0.016666668):
-    fdelta_update_landmark = b"\x32\xd2\xd9" 
-    fdelta_landmark = b"\x88\x51\x1c\xc7" 
+    fdelta_update_offset = Landmark(b"\x32\xd2\xd9", 1).to_offset(exe.mem).value
+    fdelta_offset = Landmark(b"\x88\x51\x1c\xc7", 5).to_offset(exe.mem).value
     dump_addrs = {
         "US05": 0x005c5f00,
         "US04": 0x005c5f00,
@@ -108,11 +108,9 @@ def lock_fdelta_mod(exe: GameExecutable, fdelta=0.016666668):
     dump_addr = dump_addrs[exe.game_ver].to_bytes(4, 'little')
 
     # Make code which was updating fdelta to enforce the variable framerate instead put fdelta somewhere unused.
-    fdelta_update_offset = get_offset_after(exe.mem, fdelta_update_landmark) + 1
     exe.mem[fdelta_update_offset:fdelta_update_offset+4] = dump_addr
 
     # Change fdelta initialization value to the desired value
-    fdelta_offset = get_offset_after(exe.mem, fdelta_landmark) + 5
     exe.mem[fdelta_offset:fdelta_offset+4] = struct.pack('<f', fdelta)
 
 def do_ngplus_mod(exe):
