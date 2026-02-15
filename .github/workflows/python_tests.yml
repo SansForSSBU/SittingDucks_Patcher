@@ -16,13 +16,6 @@ jobs:
       uses: actions/setup-python@v4
       with:
         python-version: "3.11"
-
-    - name: Install dependencies
-      run: |
-        sudo apt update
-        sudo apt install -y build-essential cmake python3-dev libglib2.0-dev
-        python3 -m pip install --upgrade pip
-        pip install -e .
   
     - name: Run tests
-      run: python3 -m pytest -s
+      run: make test
