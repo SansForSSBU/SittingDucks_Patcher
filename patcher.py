@@ -101,12 +101,11 @@ def do_instaload_patch(exe: GameExecutable):
         )
     payload[4:7] = loading_ptrs[exe.game_ver]
     jmp_back, _ = ks.asm(f"JMP {ret_ptr+5}", addr=hijack_ptr+22)
-    # jmp_back = jmp_call_common(JMP_OPCODE, hijack_ptr+22, ret_ptr+5)
     payload[22:27] = jmp_back
     # We need to figure out offset for CALL too.
     frame_advance_fn_relative_offset = frame_advance_call[1:]
     frame_advance_fn_offset = get_objective_offset(int.from_bytes(frame_advance_fn_relative_offset, "little"), ret_ptr)
-    call_bytes = jmp_call_common(CALL_OPCODE, hijack_ptr + 15, frame_advance_fn_offset)
+    call_bytes, _ = ks.asm(f"CALL {frame_advance_fn_offset}", addr=hijack_ptr+15)
     payload[15:20] = call_bytes
     exe.mem[cave_offset:cave_offset+len(payload)] = payload
 
