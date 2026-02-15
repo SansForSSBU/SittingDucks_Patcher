@@ -32,6 +32,10 @@ class GameExecutable:
         with open(path, "rb") as f:
             self.mem = f.read()
             self.patched_mem = bytearray(self.mem)
+    
+    def write_to(self, path):
+        with open(path, "wb") as f:
+            f.write(self.patched_mem)
 
 def do_instaload_patch(exe: GameExecutable):
     cave_offsets = {
@@ -196,8 +200,7 @@ def main():
     if args.speedfix: lock_fdelta_mod(exe)
     if args.newgameplus: do_ngplus_mod(exe)
 
-    with open(args.out_path, "wb") as f:
-        f.write(exe.patched_mem)
+    exe.write_to(args.out_path)
 
 if __name__ == "__main__":
     main()
