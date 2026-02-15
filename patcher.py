@@ -1,23 +1,4 @@
-"""
---- INSTRUCTIONS ---
-Set game_folder to the path to your game's folder.
-Set instant_loading, speed_issue_fix and new_game_plus to True if you want them enabled, False if you don't.
-Once you've set everything, run the script. It will automatically create a backup and overwrite overlay.exe.
-You should now be able to launch overlay.exe and the mods you've chosen will be active.
-
-NOTE: If using speed issue fix, you must cap the framerate to 60 via an external program such as DxWnd or the game will run incredibly fast.
-Make sure the game is actually running at 60FPS
-If it's running slower despite you setting the frame limiter in DxWnd, try enabling Kill D3D Vsync in DxWnd.
-NOTE: Speedruns must use instant_loading and speed_issue_fix
-"""
-
 import argparse
-
-game_folder = "C:/Users/Joseph/Desktop/Ducks/Sitting Ducks EU"
-# MODS
-instant_loading = True
-speed_issue_fix = True
-new_game_plus = False
 
 def do_instaload_patch():
     global patched_mem
