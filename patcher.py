@@ -93,14 +93,13 @@ def do_instaload_patch(exe: GameExecutable):
     jmp_back, _ = ks.asm(f"JMP {ret_ptr+5}", addr=hijack_ptr+22)
     call_bytes, _ = ks.asm(f"CALL {frame_advance_fn_offset}", addr=hijack_ptr+15)
     payload = bytearray(
-        b"\x60\x9C\x83\x3D"
-        b"\x00\x00\x00" # Loading pointer. If 0, we are not loading. Index 4-6.
+        b"\x60\x9C\x83\x3D" +
+        bytes(loading_ptrs[exe.game_ver]) +
         b"\x00\x00\x0F\x85\x05\x00\x00\x00"
         b"\xE8\x00\x00\x00\x00" # CALL to original routine. Index 15-19.
         b"\x9D\x61"
         b"\xE9\x00\x00\x00\x00" # JMP back to where we hijacked from. Index 22-26.
         )
-    payload[4:7] = loading_ptrs[exe.game_ver]
     payload[22:27] = jmp_back
     payload[15:20] = call_bytes
     exe.mem[cave_offset:cave_offset+len(payload)] = payload
