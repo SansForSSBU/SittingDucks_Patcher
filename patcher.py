@@ -67,11 +67,11 @@ def do_instaload_patch(exe: GameExecutable):
     md.detail = True
     frame_advance_fn_offset = list(md.disasm(frame_advance_call, ret_ptr))[0].operands[0].imm
 
-    a = data.loading_ptrs_hex[exe.game_ver]
+    loading_ptr = data.loading_ptrs_hex[exe.game_ver]
     payload_asm = f"""
         pushal
         pushfd
-        cmp dword ptr [{a:#x}], 0
+        cmp dword ptr [{loading_ptr:#x}], 0
         .byte 0x0F, 0x85, 0x05, 0x00, 0x00, 0x00
         call {frame_advance_fn_offset:#x}
         popfd
