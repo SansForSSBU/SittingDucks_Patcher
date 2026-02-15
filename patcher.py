@@ -67,15 +67,13 @@ def do_instaload_patch(exe: GameExecutable):
     md = Cs(CS_ARCH_X86, CS_MODE_32)
     md.detail = True
 
-    
+    # Find the absolute offset of the frame advance function
     frame_advance_call_offset = Landmark(b'\xff\x52\x24\xE8\xE5\xFD\xFF\xFF', -5).to_offset(exe.mem).value
-    frame_advance_call = exe.mem[frame_advance_call_offset:frame_advance_call_offset+5]
-    
+    frame_advance_call_bytes = exe.mem[frame_advance_call_offset:frame_advance_call_offset+5]
     ret_ptr = FileOffset(frame_advance_call_offset).to_runtime_offset(exe).value
-    # Find absolute offset of the frame advance function
-    frame_advance_fn_offset = list(md.disasm(frame_advance_call, ret_ptr))[0].operands[0].imm
+    frame_advance_fn_offset = list(md.disasm(frame_advance_call_bytes, ret_ptr))[0].operands[0].imm
 
-    # Insert the hijack to jump to the code cave where the original call to the frame advance function was
+    # Replace the original call to the frame advance function with a jump to the payload
     cave_offset = data.cave_offsets[exe.game_ver]
     hijack_ptr = FileOffset(cave_offset).to_runtime_offset(exe).value
     jmp_to_hijack, _ = ks.asm(f"JMP {hijack_ptr}", addr=ret_ptr)
