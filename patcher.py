@@ -1,6 +1,7 @@
 import argparse
 import pefile
 import hashlib
+import struct
 
 JMP_OPCODE = 0xE9
 CALL_OPCODE = 0xE8
@@ -45,7 +46,7 @@ def do_instaload_patch():
     payload[15:20] = call_bytes
     patched_mem[cave_offset:cave_offset+len(payload)] = payload
 
-def lock_fdelta_mod():
+def lock_fdelta_mod(fdelta=0.016666668):
     global patched_mem
     find1 = b"\x32\xd2\xd9" 
     find2 = b"\x88\x51\x1c\xc7" 
@@ -63,7 +64,7 @@ def lock_fdelta_mod():
     patched_mem[x+2:x+6] = dump_addr
     # Change the 0.33333 to 0.166666
     y = get_offset_after(mem, find2)
-    patched_mem[y+5:y+9] = bytes.fromhex("89 88 88 3c")
+    patched_mem[y+5:y+9] = struct.pack('<f', fdelta)
 
 def do_ngplus_mod():
     global patched_mem
