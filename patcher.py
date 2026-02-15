@@ -2,7 +2,7 @@ import argparse
 import pefile
 import hashlib
 import struct
-from keystone import *
+from keystone import Ks, KS_ARCH_X86, KS_MODE_32
 from capstone import Cs, CS_ARCH_X86, CS_MODE_32
 
 class Offset:
