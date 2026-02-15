@@ -15,20 +15,4 @@ def run_patcher(ver, instaload=False, speedfix=False, newgameplus=False):
     subprocess.run(args)
 
 class TestPatcher(unittest.TestCase):
-    def test_output_file_hashes(self):
-        # TODO: Once all game versions have been gathered, use a for loop to try all.
-        game_ver = "EU"
-        permutations = list(product([False, True], repeat=3))
-        hashes = {}
-        for perm in permutations:
-            run_patcher(game_ver, instaload=perm[0], speedfix=perm[1], newgameplus=perm[2])
-            hashes[str(perm)] = base64.b64encode(patcher.get_hash("test/tmp/overlay.exe")).decode("utf-8")
-        
-        print(hashes)
-        with open(f"test/hashes/{game_ver}.json", "w") as f:
-            json.dump(hashes, f, indent=4)
-
-
-
-if __name__ == "__main__":
-    unittest.main()
+    def test_regression_hashes(self):
