@@ -137,10 +137,7 @@ def do_ngplus_mod(exe):
     exe.mem[offset] = 0x20
 
 def get_relative_offset(start, dest):
-    offset = dest - start - JMP_INSTRUCTION_LEN
-    if offset < 0:
-        offset += 0x100000000
-    return offset
+    return (dest - start - JMP_INSTRUCTION_LEN) % 0x100000000
 
 def make_jmp_bytes(start, dest):
     offset = get_relative_offset(start, dest)
