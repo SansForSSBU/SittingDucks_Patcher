@@ -19,3 +19,4 @@ test: setup
 install:
 	sudo apt install -y pipx
 	pipx install .
+	pipx ensurepath
