@@ -17,17 +17,18 @@ def run_patcher(ver, instaload=False, speedfix=False, newgameplus=False):
     if newgameplus: args.append("--newgameplus")
     subprocess.run(args)
 
-def generate_regression_hashes():
+def generate_regression_hashes(game_ver):
     # TODO: Once all game versions have been gathered, use a for loop to try all.
-    game_ver = "EU"
     permutations = list(product([False, True], repeat=3))
     hashes = {}
     for perm in permutations:
         run_patcher(game_ver, instaload=perm[0], speedfix=perm[1], newgameplus=perm[2])
         hashes[str(perm)] = base64.b64encode(get_hash("test/tmp/overlay.exe")).decode("utf-8")
 
-    with open(f"test/hashes/{game_ver}.json", "w") as f:
-        json.dump(hashes, f, indent=4)
+    return hashes
 
 if __name__ == "__main__":
-    generate_regression_hashes()
+    game_ver = "EU"
+    hashes = generate_regression_hashes(game_ver)
+    with open(f"test/hashes/{game_ver}.json", "w") as f:
+        json.dump(hashes, f, indent=4)
