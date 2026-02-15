@@ -8,6 +8,23 @@ CALL_OPCODE = 0xE8
 NOP_OPCODE = 0x90
 JMP_INSTRUCTION_LEN = 5
 
+class Offset:
+    def __init__(self, value: int):
+        self.value = value
+class FileOffset(Offset):
+    pass
+
+class RuntimeOffset(Offset):
+    pass
+
+class Landmark:
+    def __init__(self, landmark_bytes, offset):
+        self.landmark_bytes = landmark_bytes
+        self.offset = offset
+
+    def to_offset(self, mem):
+        return Offset(get_offset_after(mem, self.landmark_bytes) + self.offset)
+
 def do_instaload_patch():
     global patched_mem
     prev_fn_call_landmark = b'\xff\x52\x24\xE8\xE5\xFD\xFF\xFF'
