@@ -48,23 +48,24 @@ def do_instaload_patch():
 
 def lock_fdelta_mod(fdelta=0.016666668):
     global patched_mem
-    find1 = b"\x32\xd2\xd9" 
-    find2 = b"\x88\x51\x1c\xc7" 
-    x = get_offset_after(mem, find1) - 1
+    fdelta_update_landmark = b"\x32\xd2\xd9" 
+    fdelta_landmark = b"\x88\x51\x1c\xc7" 
     dump_addrs = {
         "US05": 0x005c5f00,
         "US04": 0x005c5f00,
         "EU": 0x005ddf00,
         "RU": 0x005c6f00,
         "PO": 0x005c6f00,
-
     }
     dump_addr = dump_addrs[game_ver].to_bytes(4, 'little')
-    # Change FSTP which was storing fdelta somewhere it's used to store it in an unused place in memory.
-    patched_mem[x+2:x+6] = dump_addr
-    # Change the 0.33333 to 0.166666
-    y = get_offset_after(mem, find2)
-    patched_mem[y+5:y+9] = struct.pack('<f', fdelta)
+
+    # Make code which was updating fdelta to enforce the variable framerate instead put fdelta somewhere unused.
+    fdelta_update_offset = get_offset_after(mem, fdelta_update_landmark) + 1
+    patched_mem[fdelta_update_offset:fdelta_update_offset+4] = dump_addr
+
+    # Change fdelta initialization value to the desired value
+    fdelta_offset = get_offset_after(mem, fdelta_landmark) + 5
+    patched_mem[fdelta_offset:fdelta_offset+4] = struct.pack('<f', fdelta)
 
 def do_ngplus_mod():
     global patched_mem
