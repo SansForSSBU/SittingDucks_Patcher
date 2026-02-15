@@ -19,6 +19,8 @@ jobs:
 
     - name: Install dependencies
       run: |
+        sudo apt update
+        sudo apt install -y build-essential cmake python3-dev libglib2.0-dev
         python3 -m pip install --upgrade pip
         pip install -r requirements.txt
         pip install pytest

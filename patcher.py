@@ -146,7 +146,8 @@ def jmp_call_common(opcode, start, dest):
     args = offset.to_bytes(4, 'little')
     instr = bytearray(opcode.to_bytes(1, "little"))
     instr.extend(bytearray(args))
-    return bytes(instr)
+    a = bytes(instr)
+    return a
 
 def get_objective_offset(location, relative_offset):
     return (location + relative_offset + 5) % 0x100000000
