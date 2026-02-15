@@ -9,6 +9,8 @@ from utils import get_hash
 class Offset:
     def __init__(self, value: int):
         self.value = value
+
+
 class FileOffset(Offset):
     def to_runtime_offset(self, exe):
         for idx, thing in enumerate(exe.memMap):
@@ -17,8 +19,10 @@ class FileOffset(Offset):
             if (self.value < thing[1] or idx+1 == len(exe.memMap)) and (self.value > prev[1]):
                 return RuntimeOffset(self.value - prev[1] + prev[0])
 
+
 class RuntimeOffset(Offset):
     pass
+
 
 class Landmark:
     def __init__(self, landmark_bytes, offset):
@@ -34,6 +38,7 @@ class Landmark:
         if mem.find(self.landmark_bytes, offset) != -1:
             raise Exception("There are multiple possibilities for where to patch! Aborting")
         return Offset(offset + self.offset)
+
 
 class GameExecutable:
     def _get_mem_map(self, file_path):
@@ -54,6 +59,7 @@ class GameExecutable:
     def write_to(self, path):
         with open(path, "wb") as f:
             f.write(self.mem)
+
 
 def do_instaload_patch(exe: GameExecutable):
     # Set up keystone and capstone to handle assembly and disassembly
@@ -88,18 +94,18 @@ def do_instaload_patch(exe: GameExecutable):
     cave_offset = data.cave_offsets[exe.game_ver]
     exe.mem[cave_offset:cave_offset+len(payload)] = payload
 
-def lock_fdelta_mod(exe: GameExecutable, fdelta=0.016666668):
-    fdelta_update_offset = Landmark(b"\x32\xd2\xd9", 1).to_offset(exe.mem).value
-    fdelta_offset = Landmark(b"\x88\x51\x1c\xc7", 5).to_offset(exe.mem).value
-    dump_addr = data.dump_addrs[exe.game_ver].to_bytes(4, 'little')
-
+def lock_fdelta_mod(exe: GameExecutable, fdelta=0.016666668):  
     # Make code which was updating fdelta to enforce the variable framerate instead put fdelta somewhere unused.
+    fdelta_update_offset = Landmark(b"\x32\xd2\xd9", 1).to_offset(exe.mem).value
+    dump_addr = data.dump_addrs[exe.game_ver].to_bytes(4, 'little')
     exe.mem[fdelta_update_offset:fdelta_update_offset+4] = dump_addr
 
     # Change fdelta initialization value to the desired value
+    fdelta_offset = Landmark(b"\x88\x51\x1c\xc7", 5).to_offset(exe.mem).value
     exe.mem[fdelta_offset:fdelta_offset+4] = struct.pack('<f', fdelta)
 
 def do_ngplus_mod(exe):
+    # Break the code which initializes the player's inventory so it instead writes values greater than 0.
     offset = data.ngplus_offsets[exe.game_ver]
     exe.mem[offset] = 0x20
 
