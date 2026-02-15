@@ -1,14 +1,8 @@
-import unittest
 import subprocess
-import os
 import json
-import hashlib
 import base64
 from itertools import product
-
-def get_hash(file_path):
-    with open(file_path, "rb") as f:
-        return hashlib.file_digest(f, "md5").digest()
+from utils import get_hash
 
 def run_patcher(game_ver, instaload=False, speedfix=False, newgameplus=False):
     overlay = "overlay.exe" if game_ver in ["EU", "US04", "US05"] else "OVERLAY.exe"

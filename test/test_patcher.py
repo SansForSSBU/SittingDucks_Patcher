@@ -1,11 +1,5 @@
-import unittest
 import subprocess
-import os
-import patcher
 import json
-import hashlib
-import base64
-from itertools import product
 import generate_regression_hashes
 
 def run_patcher(ver, instaload=False, speedfix=False, newgameplus=False):

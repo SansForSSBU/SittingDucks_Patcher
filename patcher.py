@@ -1,13 +1,16 @@
 import argparse
 import pefile
-import hashlib
 import struct
-from keystone import *
+from keystone import Ks, KS_ARCH_X86, KS_MODE_32
 from capstone import Cs, CS_ARCH_X86, CS_MODE_32
+import data as data
+from utils import get_hash
 
 class Offset:
     def __init__(self, value: int):
         self.value = value
+
+
 class FileOffset(Offset):
     def to_runtime_offset(self, exe):
         for idx, thing in enumerate(exe.memMap):
@@ -16,8 +19,10 @@ class FileOffset(Offset):
             if (self.value < thing[1] or idx+1 == len(exe.memMap)) and (self.value > prev[1]):
                 return RuntimeOffset(self.value - prev[1] + prev[0])
 
+
 class RuntimeOffset(Offset):
     pass
+
 
 class Landmark:
     def __init__(self, landmark_bytes, offset):
@@ -34,14 +39,8 @@ class Landmark:
             raise Exception("There are multiple possibilities for where to patch! Aborting")
         return Offset(offset + self.offset)
 
+
 class GameExecutable:
-    game_vers = {
-        b'\x83t\x1e\x0c\x07\xc4\x19\xaf\x14j\xc9Y\xc1\xe6\x81\\': "EU",
-        b'\x0e\xc3G\xb6\xa9nP\xa3\xf6\xbcw\xbfgZ\xb1\x93': "PO",
-        b'\xe8\xd8\xfa5\xff\x9f\xecw\x1b\xfd\xfa\x81\xe1\x0c\xf9\x04': "RU",
-        b'\xa4KgS\x7f+\xec\x16#\xa7\x9bx\xc7\x12\xae\x1b': "US04",
-        b'\xcf2\xa4\x94\x80-\xdb\x0c\xd3S\xac\xa4\xf6D9\x98': "US05"
-    }
     def _get_mem_map(self, file_path):
         pe = pefile.PE(file_path)
         mem_map = [(0x00400000, 0x0)]
@@ -53,7 +52,7 @@ class GameExecutable:
 
     def __init__(self, path):
         self.memMap = self._get_mem_map(path)
-        self.game_ver = self.game_vers[get_hash(path)]
+        self.game_ver = data.game_vers[get_hash(path)]
         with open(path, "rb") as f:
             self.mem = bytearray(f.read())
 
@@ -61,38 +60,31 @@ class GameExecutable:
         with open(path, "wb") as f:
             f.write(self.mem)
 
-def do_instaload_patch(exe: GameExecutable):
-    cave_offsets = {
-        "EU": 0x1dcd1c,
-        "PO": 0x1924a0,
-        "RU": 0x1924a0,
-        "US04": 0x191970,
-        "US05": 0x191970,
-    }
-    loading_ptrs_hex = {
-        "EU": 0x5c2b9c,
-        "PO": 0x5c3bdc,
-        "RU": 0x5c3bdc,
-        "US04": 0x5c2b9c,
-        "US05": 0x5c2b9c
-    }
 
-    cave_offset = cave_offsets[exe.game_ver]
-    frame_advance_call_offset = Landmark(b'\xff\x52\x24\xE8\xE5\xFD\xFF\xFF', -5).to_offset(exe.mem).value
-    frame_advance_call = exe.mem[frame_advance_call_offset:frame_advance_call_offset+5]
-    hijack_ptr = FileOffset(cave_offset).to_runtime_offset(exe).value
-    ret_ptr = FileOffset(frame_advance_call_offset).to_runtime_offset(exe).value
+def do_instaload_patch(exe: GameExecutable):
+    # Set up keystone and capstone to handle assembly and disassembly
     ks = Ks(KS_ARCH_X86, KS_MODE_32)
     md = Cs(CS_ARCH_X86, CS_MODE_32)
-
     md.detail = True
-    frame_advance_fn_offset = list(md.disasm(frame_advance_call, ret_ptr))[0].operands[0].imm
 
-    a = loading_ptrs_hex[exe.game_ver]
+    # Find the absolute offset of the frame advance function
+    frame_advance_call_offset = Landmark(b'\xff\x52\x24\xE8\xE5\xFD\xFF\xFF', -5).to_offset(exe.mem).value
+    frame_advance_call_bytes = exe.mem[frame_advance_call_offset:frame_advance_call_offset+5]
+    ret_ptr = FileOffset(frame_advance_call_offset).to_runtime_offset(exe).value
+    frame_advance_fn_offset = list(md.disasm(frame_advance_call_bytes, ret_ptr))[0].operands[0].imm
+
+    # Replace the original call to the frame advance function with a jump to the payload
+    cave_offset = data.cave_offsets[exe.game_ver]
+    hijack_ptr = FileOffset(cave_offset).to_runtime_offset(exe).value
+    jmp_to_hijack, _ = ks.asm(f"JMP {hijack_ptr}", addr=ret_ptr)
+    exe.mem[frame_advance_call_offset:frame_advance_call_offset+len(jmp_to_hijack)] = jmp_to_hijack
+
+    # Construct the payload and insert it into the code cave
+    loading_ptr = data.loading_ptrs_hex[exe.game_ver]
     payload_asm = f"""
         pushal
         pushfd
-        cmp dword ptr [{a:#x}], 0
+        cmp dword ptr [{loading_ptr:#x}], 0
         .byte 0x0F, 0x85, 0x05, 0x00, 0x00, 0x00
         call {frame_advance_fn_offset:#x}
         popfd
@@ -102,47 +94,22 @@ def do_instaload_patch(exe: GameExecutable):
     payload, _ = ks.asm(payload_asm, addr=hijack_ptr)
     exe.mem[cave_offset:cave_offset+len(payload)] = payload
 
-    jmp_to_hijack, _ = ks.asm(f"JMP {hijack_ptr}", addr=ret_ptr)
-    exe.mem[frame_advance_call_offset:frame_advance_call_offset+len(jmp_to_hijack)] = jmp_to_hijack
+    
 
-def print_asm(asm, addr):
-    md = Cs(CS_ARCH_X86, CS_MODE_32)
-    for instr in md.disasm(asm, addr):
-        print(instr)
-
-def lock_fdelta_mod(exe: GameExecutable, fdelta=0.016666668):
-    fdelta_update_offset = Landmark(b"\x32\xd2\xd9", 1).to_offset(exe.mem).value
-    fdelta_offset = Landmark(b"\x88\x51\x1c\xc7", 5).to_offset(exe.mem).value
-    dump_addrs = {
-        "US05": 0x005c5f00,
-        "US04": 0x005c5f00,
-        "EU": 0x005ddf00,
-        "RU": 0x005c6f00,
-        "PO": 0x005c6f00,
-    }
-    dump_addr = dump_addrs[exe.game_ver].to_bytes(4, 'little')
-
+def lock_fdelta_mod(exe: GameExecutable, fdelta=0.016666668):  
     # Make code which was updating fdelta to enforce the variable framerate instead put fdelta somewhere unused.
+    fdelta_update_offset = Landmark(b"\x32\xd2\xd9", 1).to_offset(exe.mem).value
+    dump_addr = data.dump_addrs[exe.game_ver].to_bytes(4, 'little')
     exe.mem[fdelta_update_offset:fdelta_update_offset+4] = dump_addr
 
     # Change fdelta initialization value to the desired value
+    fdelta_offset = Landmark(b"\x88\x51\x1c\xc7", 5).to_offset(exe.mem).value
     exe.mem[fdelta_offset:fdelta_offset+4] = struct.pack('<f', fdelta)
 
 def do_ngplus_mod(exe):
-    offsets = {
-        "EU": 0x93C3E,
-        "RU": 0x947DE,
-        "PO": 0x947FE,
-        "US04": 0x94D3A,
-        "US05": 0x94D3A,
-    }
-    offset = offsets[exe.game_ver]
+    # Break the code which initializes the player's inventory so it instead writes values greater than 0.
+    offset = data.ngplus_offsets[exe.game_ver]
     exe.mem[offset] = 0x20
-
-# TODO: Move into utility file
-def get_hash(file_path):
-    with open(file_path, "rb") as f:
-        return hashlib.file_digest(f, "md5").digest()
 
 def parse_CLI():
     parser = argparse.ArgumentParser(description="SittingDucks_Patcher")
