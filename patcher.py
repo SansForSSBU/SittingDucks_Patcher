@@ -26,6 +26,13 @@ class Landmark:
         return Offset(get_offset_after(mem, self.landmark_bytes) + self.offset)
 
 class GameExecutable:
+    game_vers = {
+        b'\x83t\x1e\x0c\x07\xc4\x19\xaf\x14j\xc9Y\xc1\xe6\x81\\': "EU",
+        b'\x0e\xc3G\xb6\xa9nP\xa3\xf6\xbcw\xbfgZ\xb1\x93': "PO",
+        b'\xe8\xd8\xfa5\xff\x9f\xecw\x1b\xfd\xfa\x81\xe1\x0c\xf9\x04': "RU",
+        b'\xa4KgS\x7f+\xec\x16#\xa7\x9bx\xc7\x12\xae\x1b': "US04",
+        b'\xcf2\xa4\x94\x80-\xdb\x0c\xd3S\xac\xa4\xf6D9\x98': "US05"
+    }
     def _get_mem_map(self, file_path):
         pe = pefile.PE(file_path)
         mem_map = [(0x00400000, 0x0)]
@@ -37,7 +44,7 @@ class GameExecutable:
 
     def __init__(self, path):
         self.memMap = self._get_mem_map(path)
-        self.game_ver = get_file_hash(path)
+        self.game_ver = self.game_vers[get_hash(path)]
         with open(path, "rb") as f:
             self.mem = bytearray(f.read())
 
@@ -160,20 +167,10 @@ def translate_to_runtime_offset(file_offset, exe):
         if (file_offset < thing[1] or idx+1 == len(exe.memMap)) and (file_offset > prev[1]):
             return file_offset - prev[1] + prev[0]
 
-game_vers = {
-    b'\x83t\x1e\x0c\x07\xc4\x19\xaf\x14j\xc9Y\xc1\xe6\x81\\': "EU",
-    b'\x0e\xc3G\xb6\xa9nP\xa3\xf6\xbcw\xbfgZ\xb1\x93': "PO",
-    b'\xe8\xd8\xfa5\xff\x9f\xecw\x1b\xfd\xfa\x81\xe1\x0c\xf9\x04': "RU",
-    b'\xa4KgS\x7f+\xec\x16#\xa7\x9bx\xc7\x12\xae\x1b': "US04",
-    b'\xcf2\xa4\x94\x80-\xdb\x0c\xd3S\xac\xa4\xf6D9\x98': "US05"
-}
-
+# TODO: Move into utility file
 def get_hash(file_path):
     with open(file_path, "rb") as f:
         return hashlib.file_digest(f, "md5").digest()
-
-def get_file_hash(file_path):
-    return game_vers[get_hash(file_path)]
 
 def parse_CLI():
     parser = argparse.ArgumentParser(description="SittingDucks_Patcher")
