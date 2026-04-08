@@ -1,10 +1,10 @@
 ## For players:
 
-Please use https://josephtaylor.dev/duckpatch/ to obtain a patched exe. Don't bother installing this.
+Please visit the Sitting Ducks speedrunning discord server (https://discord.com/invite/kGgjPWd3Pq) for instructions on how to patch your game.
 
-## System Requirements
+## Explanation
 
-This tool is intended to run on Linux servers. A link to a page where you can upload exes to be patched will be added soon.
+This tool is designed to run on Linux systems. It makes patches to the exe file to fix the game's issues with inconsistent game speed and slow load times.
 
 # Installation:
 
