@@ -24,6 +24,8 @@ From root of project:
 
 `make install`
 
+Then close and re-open your terminal.
+
 # Uninstallation:
 
 `pipx uninstall duckpatch`
