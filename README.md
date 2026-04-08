@@ -1,6 +1,6 @@
 ## For players:
 
-Please visit the Sitting Ducks speedrunning discord server (https://discord.com/invite/kGgjPWd3Pq) for instructions on how to patch your game.
+Please visit the Sitting Ducks speedrunning discord server (https://discord.com/invite/kGgjPWd3Pq) for instructions on how to patch your game. You do not need to directly use this tool because pre-patched game executables are available here.
 
 ## Explanation
 
