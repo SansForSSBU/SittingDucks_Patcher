@@ -1,3 +1,7 @@
+# Description
+
+This is a patch tool used to produce patched executables for all known PC versions of Sitting Ducks (2004) and improve playability on modern hardware. It supports all known releases (EU, PO, RU, US 2004, US 2005). 
+
 # Features
 
 ## Instant loading patch
